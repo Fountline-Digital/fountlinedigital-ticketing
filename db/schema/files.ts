@@ -1,5 +1,6 @@
 // File metadata. The file itself lives in Cloudflare R2 at `storage_key`:
 //   {org}/{client}/{project}/{ticket}/{yyyymmdd}-{original-name}
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { bigint, index, pgTable, text, uuid } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./columns";
 import { visibility } from "./enums";
@@ -18,11 +19,11 @@ export const files = pgTable(
     originalName: text("original_name").notNull(),
     mimeType: text("mime_type").notNull(),
     sizeBytes: bigint("size_bytes", { mode: "number" }).notNull(),
-    uploadedByUserId: uuid("uploaded_by_user_id").references(() => users.id, { onDelete: "set null" }),
-    clientId: uuid("client_id").references(() => clients.id, { onDelete: "set null" }),
-    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
-    ticketId: uuid("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
-    commentId: uuid("comment_id").references(() => comments.id, { onDelete: "set null" }),
+    uploadedByUserId: uuid("uploaded_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+    clientId: uuid("client_id").references((): AnyPgColumn => clients.id, { onDelete: "set null" }),
+    projectId: uuid("project_id").references((): AnyPgColumn => projects.id, { onDelete: "set null" }),
+    ticketId: uuid("ticket_id").references((): AnyPgColumn => tickets.id, { onDelete: "set null" }),
+    commentId: uuid("comment_id").references((): AnyPgColumn => comments.id, { onDelete: "set null" }),
     visibility: visibility("visibility").notNull().default("internal"),
     ...timestamps(),
     ...softDelete(),

@@ -1,5 +1,6 @@
 // Organizations (tenants). Kept free of imports from other schema files so the
 // `orgId()` helper is always ready when other tables are defined.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { jsonb, pgTable, text, uuid, varchar } from "drizzle-orm/pg-core";
 import { pk, timestamps } from "./columns";
 
@@ -50,4 +51,4 @@ export const organizations = pgTable("organizations", {
 export const orgId = () =>
   uuid("org_id")
     .notNull()
-    .references(() => organizations.id, { onDelete: "cascade" });
+    .references((): AnyPgColumn => organizations.id, { onDelete: "cascade" });

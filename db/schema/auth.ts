@@ -1,6 +1,7 @@
 // Auth.js (NextAuth v5) tables, shaped for @auth/drizzle-adapter.
 // Property names must stay as Auth.js expects; DB columns are snake_case.
 // Database sessions (not JWT) so admins can revoke sessions instantly.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { boolean, integer, jsonb, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
 import { pk, timestamps, ts } from "./columns";
 
@@ -20,7 +21,7 @@ export const accounts = pgTable(
   {
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
     provider: text("provider").notNull(),
     providerAccountId: text("provider_account_id").notNull(),
@@ -39,7 +40,7 @@ export const sessions = pgTable("sessions", {
   sessionToken: text("session_token").primaryKey(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
   expires: ts("expires").notNull(),
   // Extra columns for inactivity timeouts, "revoke all sessions" and the audit log.
   ipAddress: text("ip_address"),
@@ -64,7 +65,7 @@ export const verificationTokens = pgTable(
 export const userMfa = pgTable("user_mfa", {
   userId: uuid("user_id")
     .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
   totpSecretEncrypted: text("totp_secret_encrypted").notNull(),
   recoveryCodesHashed: jsonb("recovery_codes_hashed").$type<string[]>().notNull().default([]),
   enabledAt: ts("enabled_at"),

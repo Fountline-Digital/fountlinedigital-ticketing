@@ -1,4 +1,5 @@
 // Clients (the businesses you work for) and their contacts.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { boolean, pgTable, text, unique, uuid, varchar, index } from "drizzle-orm/pg-core";
 import { pk, softDelete, timestamps } from "./columns";
 import { clientStatus } from "./enums";
@@ -18,7 +19,7 @@ export const clients = pgTable(
     phone: text("phone"),
     status: clientStatus("status").notNull().default("active"),
     notes: text("notes"), // internal only
-    convertedFromTicketId: uuid("converted_from_ticket_id").references(() => tickets.id, {
+    convertedFromTicketId: uuid("converted_from_ticket_id").references((): AnyPgColumn => tickets.id, {
       onDelete: "set null",
     }),
     ...timestamps(),
@@ -38,8 +39,8 @@ export const clientContacts = pgTable(
     orgId: orgId(),
     clientId: uuid("client_id")
       .notNull()
-      .references(() => clients.id, { onDelete: "cascade" }),
-    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }), // set once they have a portal login
+      .references((): AnyPgColumn => clients.id, { onDelete: "cascade" }),
+    userId: uuid("user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }), // set once they have a portal login
     name: text("name").notNull(),
     email: text("email").notNull(),
     phone: text("phone"),

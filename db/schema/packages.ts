@@ -27,10 +27,10 @@ export const packages = pgTable(
     key: varchar("key", { length: 32 }).notNull(), // FD-WEB-BUS
     serviceLineId: uuid("service_line_id")
       .notNull()
-      .references(() => serviceLines.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => serviceLines.id, { onDelete: "restrict" }),
     tierId: uuid("tier_id")
       .notNull()
-      .references(() => tiers.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => tiers.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     description: text("description"),
     priceCents: integer("price_cents"),
@@ -50,7 +50,7 @@ export const packageVersions = pgTable(
     orgId: orgId(),
     packageId: uuid("package_id")
       .notNull()
-      .references(() => packages.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => packages.id, { onDelete: "cascade" }),
     version: integer("version").notNull(), // FD-WEB-BUS-v3
     revisionRounds: integer("revision_rounds").notNull().default(2),
     responseTargetMinutes: integer("response_target_minutes"), // business minutes
@@ -60,7 +60,7 @@ export const packageVersions = pgTable(
     closeoutChecklist: jsonb("closeout_checklist").$type<string[]>().notNull().default([]),
     notes: text("notes"),
     publishedAt: ts("published_at"),
-    createdByUserId: uuid("created_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    createdByUserId: uuid("created_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [unique("package_versions_package_version_uq").on(t.packageId, t.version)],
@@ -73,7 +73,7 @@ export const phaseTemplates = pgTable(
     orgId: orgId(),
     packageVersionId: uuid("package_version_id")
       .notNull()
-      .references(() => packageVersions.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => packageVersions.id, { onDelete: "cascade" }),
     position: integer("position").notNull(), // P1, P2, ...
     name: text("name").notNull(),
     description: text("description"),
@@ -90,12 +90,12 @@ export const taskTemplates = pgTable(
     orgId: orgId(),
     phaseTemplateId: uuid("phase_template_id")
       .notNull()
-      .references(() => phaseTemplates.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => phaseTemplates.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     code: varchar("code", { length: 16 }).notNull(), // "2.03" -> FD-WEB-BUS-2.03
     title: text("title").notNull(),
     description: text("description"),
-    ticketTypeId: uuid("ticket_type_id").references(() => ticketTypes.id, { onDelete: "set null" }),
+    ticketTypeId: uuid("ticket_type_id").references((): AnyPgColumn => ticketTypes.id, { onDelete: "set null" }),
     defaultRole: membershipRole("default_role"),
     estimateMinutes: integer("estimate_minutes"),
     checklist: jsonb("checklist").$type<string[]>().notNull().default([]),
@@ -109,10 +109,10 @@ export const taskTemplateDependencies = pgTable(
   {
     taskTemplateId: uuid("task_template_id")
       .notNull()
-      .references(() => taskTemplates.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => taskTemplates.id, { onDelete: "cascade" }),
     dependsOnTaskTemplateId: uuid("depends_on_task_template_id")
       .notNull()
-      .references(() => taskTemplates.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => taskTemplates.id, { onDelete: "cascade" }),
   },
   (t) => [primaryKey({ columns: [t.taskTemplateId, t.dependsOnTaskTemplateId] })],
 );
@@ -121,7 +121,7 @@ export const taskTemplateDependencies = pgTable(
 export const questionnaires = pgTable("questionnaires", {
   id: pk(),
   orgId: orgId(),
-  packageId: uuid("package_id").references(() => packages.id, { onDelete: "set null" }),
+  packageId: uuid("package_id").references((): AnyPgColumn => packages.id, { onDelete: "set null" }),
   name: text("name").notNull(),
   isActive: boolean("is_active").notNull().default(true),
   ...timestamps(),
@@ -134,7 +134,7 @@ export const questionnaireQuestions = pgTable(
     orgId: orgId(),
     questionnaireId: uuid("questionnaire_id")
       .notNull()
-      .references(() => questionnaires.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => questionnaires.id, { onDelete: "cascade" }),
     position: integer("position").notNull(),
     label: text("label").notNull(),
     helpText: text("help_text"),

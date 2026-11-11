@@ -1,4 +1,5 @@
 // Admin-editable lookups and settings tables. Nothing here is hard-coded in the app.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   boolean,
   integer,
@@ -79,10 +80,10 @@ export const phaseNames = pgTable("phase_names", lookup());
 // Default assignee per service line and/or ticket type, or round-robin across a pool.
 export const assignmentRules = pgTable("assignment_rules", {
   ...lookup(),
-  serviceLineId: uuid("service_line_id").references(() => serviceLines.id, { onDelete: "cascade" }),
-  ticketTypeId: uuid("ticket_type_id").references(() => ticketTypes.id, { onDelete: "cascade" }),
+  serviceLineId: uuid("service_line_id").references((): AnyPgColumn => serviceLines.id, { onDelete: "cascade" }),
+  ticketTypeId: uuid("ticket_type_id").references((): AnyPgColumn => ticketTypes.id, { onDelete: "cascade" }),
   strategy: assignmentStrategy("strategy").notNull().default("fixed"),
-  assigneeMembershipId: uuid("assignee_membership_id").references(() => memberships.id, {
+  assigneeMembershipId: uuid("assignee_membership_id").references((): AnyPgColumn => memberships.id, {
     onDelete: "set null",
   }),
   poolMembershipIds: uuid("pool_membership_ids").array().notNull().default([]),
@@ -93,10 +94,10 @@ export const assignmentRules = pgTable("assignment_rules", {
 export const contactFormRules = pgTable("contact_form_rules", {
   ...lookup(),
   conditions: jsonb("conditions").$type<Record<string, string | string[]>>().notNull().default({}),
-  packageId: uuid("package_id").references(() => packages.id, { onDelete: "set null" }),
-  ticketTypeId: uuid("ticket_type_id").references(() => ticketTypes.id, { onDelete: "set null" }),
-  priorityId: uuid("priority_id").references(() => priorities.id, { onDelete: "set null" }),
-  assigneeMembershipId: uuid("assignee_membership_id").references(() => memberships.id, {
+  packageId: uuid("package_id").references((): AnyPgColumn => packages.id, { onDelete: "set null" }),
+  ticketTypeId: uuid("ticket_type_id").references((): AnyPgColumn => ticketTypes.id, { onDelete: "set null" }),
+  priorityId: uuid("priority_id").references((): AnyPgColumn => priorities.id, { onDelete: "set null" }),
+  assigneeMembershipId: uuid("assignee_membership_id").references((): AnyPgColumn => memberships.id, {
     onDelete: "set null",
   }),
   titleTemplate: text("title_template").notNull().default("New inquiry: {name}"),
@@ -116,7 +117,7 @@ export const requestForms = pgTable("request_forms", {
   ...lookup(),
   ticketTypeId: uuid("ticket_type_id")
     .notNull()
-    .references(() => ticketTypes.id, { onDelete: "cascade" }),
+    .references((): AnyPgColumn => ticketTypes.id, { onDelete: "cascade" }),
   fields: jsonb("fields").$type<FormField[]>().notNull().default([]),
 });
 
@@ -145,7 +146,7 @@ export const notificationPreferences = pgTable(
   {
     membershipId: uuid("membership_id")
       .notNull()
-      .references(() => memberships.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => memberships.id, { onDelete: "cascade" }),
     eventKey: varchar("event_key", { length: 64 }).notNull(),
     inApp: boolean("in_app").notNull().default(true),
     email: boolean("email").notNull().default(true),
@@ -185,10 +186,10 @@ export const termsAcceptances = pgTable("terms_acceptances", {
   orgId: orgId(),
   userId: uuid("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
   documentId: uuid("document_id")
     .notNull()
-    .references(() => legalDocuments.id, { onDelete: "restrict" }),
+    .references((): AnyPgColumn => legalDocuments.id, { onDelete: "restrict" }),
   acceptedAt: ts("accepted_at").notNull().defaultNow(),
   ipAddress: text("ip_address"),
 });

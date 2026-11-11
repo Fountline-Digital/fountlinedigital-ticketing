@@ -1,4 +1,5 @@
 // In-app notifications and the append-only audit log.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { index, inet, jsonb, pgTable, text, uuid, varchar } from "drizzle-orm/pg-core";
 import { pk, ts } from "./columns";
 import { actorKind, membershipRole } from "./enums";
@@ -13,12 +14,12 @@ export const notifications = pgTable(
     orgId: orgId(),
     recipientUserId: uuid("recipient_user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
     eventKey: varchar("event_key", { length: 64 }).notNull(),
     title: text("title").notNull(),
     body: text("body"),
     url: text("url"),
-    ticketId: uuid("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
+    ticketId: uuid("ticket_id").references((): AnyPgColumn => tickets.id, { onDelete: "cascade" }),
     readAt: ts("read_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },

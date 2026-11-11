@@ -1,4 +1,5 @@
 // Website design catalog + picker, and logo batches + picker.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   boolean,
   integer,
@@ -38,7 +39,7 @@ export const websiteDesigns = pgTable(
     orgId: orgId(),
     collectionId: uuid("collection_id")
       .notNull()
-      .references(() => websiteCollections.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => websiteCollections.id, { onDelete: "restrict" }),
     number: integer("number").notNull(), // 04
     key: varchar("key", { length: 48 }).notNull(), // FDWD-01-04-Harbor
     name: text("name").notNull(), // Harbor
@@ -65,10 +66,10 @@ export const websiteDesignImages = pgTable(
   {
     designId: uuid("design_id")
       .notNull()
-      .references(() => websiteDesigns.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => websiteDesigns.id, { onDelete: "cascade" }),
     fileId: uuid("file_id")
       .notNull()
-      .references(() => files.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => files.id, { onDelete: "cascade" }),
     position: integer("position").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.designId, t.fileId] })],
@@ -82,12 +83,12 @@ export const projectDesignOffers = pgTable(
     orgId: orgId(),
     projectId: uuid("project_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
     designId: uuid("design_id")
       .notNull()
-      .references(() => websiteDesigns.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => websiteDesigns.id, { onDelete: "restrict" }),
     isFavorite: boolean("is_favorite").notNull().default(false),
-    offeredByUserId: uuid("offered_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    offeredByUserId: uuid("offered_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [unique("project_design_offers_uq").on(t.projectId, t.designId)],
@@ -100,14 +101,14 @@ export const websiteSelections = pgTable("website_selections", {
   projectId: uuid("project_id")
     .notNull()
     .unique()
-    .references(() => projects.id, { onDelete: "cascade" }),
+    .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
   designId: uuid("design_id")
     .notNull()
-    .references(() => websiteDesigns.id, { onDelete: "restrict" }),
+    .references((): AnyPgColumn => websiteDesigns.id, { onDelete: "restrict" }),
   colors: jsonb("colors").$type<string[]>(),
   fonts: jsonb("fonts").$type<string[]>(),
   submittedAt: ts("submitted_at"),
-  submittedByUserId: uuid("submitted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  submittedByUserId: uuid("submitted_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   lockedAt: ts("locked_at"),
   ...timestamps(),
 });
@@ -119,14 +120,14 @@ export const logoBatches = pgTable(
     orgId: orgId(),
     clientId: uuid("client_id")
       .notNull()
-      .references(() => clients.id, { onDelete: "cascade" }),
-    projectId: uuid("project_id").references(() => projects.id, { onDelete: "set null" }),
+      .references((): AnyPgColumn => clients.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references((): AnyPgColumn => projects.id, { onDelete: "set null" }),
     number: integer("number").notNull(), // Batch 01, per client
     status: logoBatchStatus("status").notNull().default("draft"),
     publishedAt: ts("published_at"),
     clientComment: text("client_comment"),
     decidedAt: ts("decided_at"),
-    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    decidedByUserId: uuid("decided_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps(),
   },
   (t) => [unique("logo_batches_client_number_uq").on(t.clientId, t.number)],
@@ -139,13 +140,13 @@ export const logoConcepts = pgTable(
     orgId: orgId(),
     batchId: uuid("batch_id")
       .notNull()
-      .references(() => logoBatches.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => logoBatches.id, { onDelete: "cascade" }),
     number: integer("number").notNull(),
     key: varchar("key", { length: 32 }).notNull(), // FDL-ACME-01-03
     name: text("name"),
     fileId: uuid("file_id")
       .notNull()
-      .references(() => files.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => files.id, { onDelete: "restrict" }),
     isFavorite: boolean("is_favorite").notNull().default(false),
     isChosen: boolean("is_chosen").notNull().default(false),
     createdAt: ts("created_at").notNull().defaultNow(),

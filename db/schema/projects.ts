@@ -1,4 +1,5 @@
 // Projects, their phases, gate approvals, closeout and intake answers.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   date,
   index,
@@ -31,13 +32,13 @@ export const projects = pgTable(
     sequence: integer("sequence").notNull(), // 1 -> "01", 100 -> "100"
     clientId: uuid("client_id")
       .notNull()
-      .references(() => clients.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => clients.id, { onDelete: "restrict" }),
     packageVersionId: uuid("package_version_id")
       .notNull()
-      .references(() => packageVersions.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => packageVersions.id, { onDelete: "restrict" }),
     serviceLineId: uuid("service_line_id")
       .notNull()
-      .references(() => serviceLines.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => serviceLines.id, { onDelete: "restrict" }),
     name: text("name").notNull(),
     status: projectStatus("status").notNull().default("active"),
     startDate: date("start_date"),
@@ -45,7 +46,7 @@ export const projects = pgTable(
     completedAt: ts("completed_at"),
     archivedAt: ts("archived_at"),
     closeoutSignedOffAt: ts("closeout_signed_off_at"),
-    closeoutSignedOffByUserId: uuid("closeout_signed_off_by_user_id").references(() => users.id, {
+    closeoutSignedOffByUserId: uuid("closeout_signed_off_by_user_id").references((): AnyPgColumn => users.id, {
       onDelete: "set null",
     }),
     ...timestamps(),
@@ -63,10 +64,10 @@ export const projectMembers = pgTable(
   {
     projectId: uuid("project_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
     membershipId: uuid("membership_id")
       .notNull()
-      .references(() => memberships.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => memberships.id, { onDelete: "cascade" }),
     addedAt: ts("added_at").notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.projectId, t.membershipId] })],
@@ -79,8 +80,8 @@ export const projectPhases = pgTable(
     orgId: orgId(),
     projectId: uuid("project_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
-    phaseTemplateId: uuid("phase_template_id").references(() => phaseTemplates.id, {
+      .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
+    phaseTemplateId: uuid("phase_template_id").references((): AnyPgColumn => phaseTemplates.id, {
       onDelete: "set null",
     }),
     position: integer("position").notNull(),
@@ -103,11 +104,11 @@ export const phaseApprovals = pgTable(
     orgId: orgId(),
     projectPhaseId: uuid("project_phase_id")
       .notNull()
-      .references(() => projectPhases.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => projectPhases.id, { onDelete: "cascade" }),
     approverKind: approverKind("approver_kind").notNull(),
     roundNumber: integer("round_number").notNull().default(1),
     decision: approvalDecision("decision").notNull().default("pending"),
-    decidedByUserId: uuid("decided_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    decidedByUserId: uuid("decided_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     decidedAt: ts("decided_at"),
     comment: text("comment"),
     createdAt: ts("created_at").notNull().defaultNow(),
@@ -120,11 +121,11 @@ export const closeoutItems = pgTable("closeout_items", {
   orgId: orgId(),
   projectId: uuid("project_id")
     .notNull()
-    .references(() => projects.id, { onDelete: "cascade" }),
+    .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
   label: text("label").notNull(),
   doneAt: ts("done_at"),
-  doneByUserId: uuid("done_by_user_id").references(() => users.id, { onDelete: "set null" }),
+  doneByUserId: uuid("done_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
 });
 
 export const questionnaireResponses = pgTable(
@@ -134,13 +135,13 @@ export const questionnaireResponses = pgTable(
     orgId: orgId(),
     projectId: uuid("project_id")
       .notNull()
-      .references(() => projects.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
     questionnaireId: uuid("questionnaire_id")
       .notNull()
-      .references(() => questionnaires.id, { onDelete: "restrict" }),
+      .references((): AnyPgColumn => questionnaires.id, { onDelete: "restrict" }),
     answers: jsonb("answers").$type<Record<string, unknown>>().notNull().default({}),
     submittedAt: ts("submitted_at"),
-    submittedByUserId: uuid("submitted_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    submittedByUserId: uuid("submitted_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     ...timestamps(),
   },
   (t) => [unique("questionnaire_responses_project_uq").on(t.projectId, t.questionnaireId)],

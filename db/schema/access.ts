@@ -1,5 +1,6 @@
 // Who belongs to which organization, with what role, plus invites,
 // editable role permissions and the counters behind readable keys.
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   boolean,
   index,
@@ -27,15 +28,15 @@ export const memberships = pgTable(
     orgId: orgId(),
     userId: uuid("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
     role: membershipRole("role").notNull(),
     status: membershipStatus("status").notNull().default("invited"),
     // Client-role members are scoped to one client.
-    clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").references((): AnyPgColumn => clients.id, { onDelete: "cascade" }),
     title: text("title"),
     // Contractors: access ends automatically after this time.
     accessExpiresAt: ts("access_expires_at"),
-    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    invitedByUserId: uuid("invited_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     lastActiveAt: ts("last_active_at"),
     ...timestamps(),
   },
@@ -52,13 +53,13 @@ export const invites = pgTable(
     orgId: orgId(),
     email: text("email").notNull(),
     role: membershipRole("role").notNull(),
-    clientId: uuid("client_id").references(() => clients.id, { onDelete: "cascade" }),
+    clientId: uuid("client_id").references((): AnyPgColumn => clients.id, { onDelete: "cascade" }),
     accessExpiresAt: ts("access_expires_at"),
     tokenHash: text("token_hash").notNull().unique(),
     expiresAt: ts("expires_at").notNull(),
     acceptedAt: ts("accepted_at"),
     revokedAt: ts("revoked_at"),
-    invitedByUserId: uuid("invited_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    invitedByUserId: uuid("invited_by_user_id").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
   (t) => [index("invites_org_email_idx").on(t.orgId, t.email)],
@@ -87,7 +88,7 @@ export const orgCounters = pgTable(
   {
     orgId: uuid("org_id")
       .notNull()
-      .references(() => organizations.id, { onDelete: "cascade" }),
+      .references((): AnyPgColumn => organizations.id, { onDelete: "cascade" }),
     scope: varchar("scope", { length: 96 }).notNull(),
     value: integer("value").notNull().default(0),
   },
