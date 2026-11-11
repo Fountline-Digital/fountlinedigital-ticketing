@@ -1,20 +1,22 @@
 "use client";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
-export function SignOutButton({ className }: { className?: string }) {
+export function SignOutButton(props: React.ComponentProps<typeof Button>) {
   const router = useRouter();
   return (
-    <button
+    <Button
       type="button"
-      className={className}
+      variant="ghost"
+      {...props}
       onClick={async () => {
         await authClient.signOut();
         router.push("/sign-in");
         router.refresh();
       }}
     >
-      Sign out
-    </button>
+      {props.children ?? "Sign out"}
+    </Button>
   );
 }

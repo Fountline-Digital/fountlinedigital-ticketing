@@ -5,6 +5,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { memberships, sessions, userMfa, users } from "@/db/schema";
 import { auth } from "@/lib/auth";
+import { can, type Permission, type Role } from "@/lib/permissions";
 
 /** Signed in, but two-factor not checked yet. Use only on the two-factor pages. */
 export async function requireSignedIn() {
@@ -44,4 +45,17 @@ export async function requireUser() {
   if (userMemberships.length === 0) redirect("/sign-in?error=no_access");
 
   return { user, session, memberships: userMemberships, membership: userMemberships[0] };
+}
+
+export type UserContext = Awaited<ReturnType<typeof requireUser>> & { orgId: string; role: Role };
+
+/**
+ * Signed in, two-factor passed, AND the active role has this permission.
+ * Pages get redirected to the dashboard; server actions should call this first too.
+ */
+export async function requirePermission(permission: Permission): Promise<UserContext> {
+  const ctx = await requireUser();
+  const role = ctx.membership.role as Role;
+  if (!(await can(ctx.membership.orgId, role, permission))) redirect("/dashboard?error=forbidden");
+  return { ...ctx, orgId: ctx.membership.orgId, role };
 }

@@ -20,3 +20,22 @@ export function magicLinkEmail(url: string) {
     <p style="margin:0;color:#666;font-size:13px">If you didn't ask to sign in, you can ignore this email.</p>
   </div>`;
 }
+
+const esc = (v: string) =>
+  v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+export function inviteEmail(opts: { orgName: string; inviterName: string; roleLabel: string; signInUrl: string; usesGoogle: boolean; expiresText: string }) {
+  const how = opts.usesGoogle
+    ? "Click the button, then choose <b>Continue with Google</b> and sign in with your work account."
+    : "Click the button, then enter this email address. We'll email you a sign-in link.";
+  return `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111">
+    <h2 style="margin:0 0 16px">You're invited to ${esc(opts.orgName)}</h2>
+    <p style="margin:0 0 12px">${esc(opts.inviterName)} invited you to join as <b>${esc(opts.roleLabel)}</b>.</p>
+    <p style="margin:0 0 24px">${how} You'll also set up two-factor sign-in with an authenticator app.</p>
+    <p style="margin:0 0 24px">
+      <a href="${esc(opts.signInUrl)}" style="background:#111;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block">Accept invite</a>
+    </p>
+    <p style="margin:0;color:#666;font-size:13px">This invite expires ${esc(opts.expiresText)}. If you weren't expecting it, you can ignore this email.</p>
+  </div>`;
+}

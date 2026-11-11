@@ -6,7 +6,7 @@ import { magicLink } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, invites, memberships, organizations, sessions, users, verifications } from "@/db/schema";
+import { accounts, clientContacts, invites, memberships, organizations, sessions, users, verifications } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { magicLinkEmail, sendEmail } from "@/lib/email";
 
@@ -63,6 +63,13 @@ async function ensureAccess(userId: string) {
       })
       .onConflictDoNothing();
     await db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
+    // Client invites: link the contact record created with the invite to this login.
+    if (invite.clientId) {
+      await db
+        .update(clientContacts)
+        .set({ userId: user.id })
+        .where(and(eq(clientContacts.clientId, invite.clientId), eq(clientContacts.email, user.email)));
+    }
     await audit({ orgId: invite.orgId, actorUserId: user.id, actorRole: invite.role, action: "invite.accept", entityType: "invite", entityId: invite.id });
   }
 

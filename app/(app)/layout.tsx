@@ -1,22 +1,44 @@
 import { requireUser } from "@/lib/session";
-import { SignOutButton } from "@/components/sign-out-button";
+import { permissionsFor, ROLE_LABELS, type Role } from "@/lib/permissions";
+import { AppSidebar, type NavSection } from "@/components/app-sidebar";
+import { Logo } from "@/components/logo";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 
 // Everything inside app/(app)/ requires sign-in + two-factor.
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, membership } = await requireUser();
+  const role = membership.role as Role;
+  const can = await permissionsFor(membership.orgId, role);
+
+  const sections: NavSection[] = [
+    {
+      label: "Work",
+      items: [
+        { href: "/dashboard", label: "Dashboard", icon: "dashboard" },
+        { href: "/tickets", label: "Tickets", icon: "tickets", soon: true },
+        { href: "/projects", label: "Projects", icon: "projects", soon: true },
+        ...(can["clients.view"] ? [{ href: "/clients", label: "Clients", icon: "clients" as const, soon: true }] : []),
+      ],
+    },
+  ];
+
+  const admin = [
+    ...(can["packages.manage"] ? [{ href: "/packages", label: "Packages", icon: "packages" as const, soon: true }] : []),
+    ...(can["users.view"] ? [{ href: "/settings/users", label: "Users & invites", icon: "users" as const }] : []),
+    ...(can["settings.manage"] ? [{ href: "/settings/general", label: "Settings", icon: "settings" as const, soon: true }] : []),
+  ];
+  if (admin.length > 0) sections.push({ label: "Admin", items: admin });
 
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b px-6 py-3">
-        <span className="font-semibold">Fountline Digital</span>
-        <div className="flex items-center gap-4 text-sm">
-          <span className="text-gray-600">
-            {user.email} · {membership.role}
-          </span>
-          <SignOutButton className="underline" />
-        </div>
-      </header>
-      <main className="p-6">{children}</main>
-    </div>
+    <SidebarProvider>
+      <AppSidebar sections={sections} user={{ name: user.name, email: user.email, roleLabel: ROLE_LABELS[role] }} />
+      <SidebarInset>
+        <header className="flex h-12 items-center gap-2 border-b px-4">
+          <SidebarTrigger />
+          <Logo className="text-xs md:hidden" />
+        </header>
+        <div className="flex-1 p-4 md:p-8">{children}</div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
