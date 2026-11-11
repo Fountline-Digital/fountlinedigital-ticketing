@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ];
 
   const admin = [
-    ...(can["packages.manage"] ? [{ href: "/packages", label: "Packages", icon: "packages" as const, soon: true }] : []),
+    ...(can["packages.manage"] ? [{ href: "/packages", label: "Packages", icon: "packages" as const }] : []),
     ...(can["users.view"] ? [{ href: "/settings/users", label: "Users & invites", icon: "users" as const }] : []),
     ...(can["settings.manage"] ? [{ href: "/settings/general", label: "Settings", icon: "settings" as const, soon: true }] : []),
   ];
@@ -33,9 +33,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <SidebarProvider>
       <AppSidebar sections={sections} user={{ name: user.name, email: user.email, roleLabel: ROLE_LABELS[role] }} />
       <SidebarInset>
-        <header className="flex h-12 items-center gap-2 border-b px-4">
+        <header className="flex h-20 items-center gap-3 border-b bg-background px-4">
           <SidebarTrigger />
-          <Logo className="text-xs md:hidden" />
+          <Logo className="h-14 md:hidden" />
         </header>
         <div className="flex-1 p-4 md:p-8">{children}</div>
       </SidebarInset>

@@ -12,8 +12,8 @@ export function AuthShell({
   children: React.ReactNode;
 }) {
   return (
-    <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-muted/40 p-6">
-      <Logo className="text-lg" />
+    <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background p-6">
+      <Logo className="h-28" />
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle className="text-xl">{title}</CardTitle>

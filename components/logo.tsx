@@ -1,17 +1,10 @@
 import { cn } from "@/lib/utils";
 
-// Text wordmark for now. Swap for the real logo file once it's in /public/brand/.
-export function Logo({ className, inverted = false }: { className?: string; inverted?: boolean }) {
+// White logo. Always place it on a black background.
+// File lives at public/brand/FD_Logo_White.svg
+export function Logo({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex items-baseline gap-1.5 font-semibold tracking-[0.18em] uppercase",
-        inverted ? "text-white" : "text-black",
-        className,
-      )}
-    >
-      Fountline
-      <span className="text-[#c0c0c0]">Digital</span>
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/brand/FD_Logo_White.svg" alt="Fountline Digital" className={cn("h-8 w-auto", className)} />
   );
 }

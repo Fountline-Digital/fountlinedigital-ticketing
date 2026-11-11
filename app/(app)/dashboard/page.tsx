@@ -12,10 +12,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
         title={firstName ? `Welcome back, ${firstName}` : "Welcome back"}
+        // TODO(launch): remove this "Signed in as" line before go-live
         description={`Signed in as ${ROLE_LABELS[membership.role as Role]}`}
       />
       {error === "forbidden" && (
-        <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+        <p className="rounded-lg border border-primary/50 bg-muted p-3 text-sm text-foreground">
           You don&apos;t have access to that page.
         </p>
       )}

@@ -52,7 +52,7 @@ export function SignInForm({ initialEmail = "" }: { initialEmail?: string }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full border-white bg-black text-white hover:text-silver">
       <Button
         type="button"
         variant="outline"

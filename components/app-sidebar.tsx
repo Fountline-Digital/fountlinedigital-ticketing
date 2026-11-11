@@ -65,9 +65,9 @@ export function AppSidebar({
 
   return (
     <Sidebar>
-      <SidebarHeader className="px-4 py-5">
-        <Link href="/dashboard">
-          <Logo inverted className="text-sm" />
+      <SidebarHeader className="items-center px-4 py-6">
+        <Link href="/dashboard" className="flex w-full justify-center">
+          <Logo className="h-20 max-w-full" />
         </Link>
       </SidebarHeader>
 
@@ -88,7 +88,15 @@ export function AppSidebar({
                           <span>{item.label}</span>
                         </SidebarMenuButton>
                       ) : (
-                        <SidebarMenuButton isActive={active} render={<Link href={item.href} />}>
+                        <SidebarMenuButton
+                          isActive={active}
+                          className={
+                            active
+                              ? "bg-primary font-medium text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                              : undefined
+                          }
+                          render={<Link href={item.href} />}
+                        >
                           <Icon />
                           <span>{item.label}</span>
                         </SidebarMenuButton>
@@ -108,7 +116,7 @@ export function AppSidebar({
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger render={<SidebarMenuButton size="lg" />}>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-[#c0c0c0] text-xs font-semibold text-black">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-semibold text-primary-foreground">
                   {initials}
                 </span>
                 <span className="grid flex-1 text-left text-sm leading-tight">

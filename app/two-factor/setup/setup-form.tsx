@@ -15,7 +15,7 @@ export function SetupForm() {
     const codes = state.recoveryCodes;
     return (
       <div className="space-y-4">
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="rounded-lg border border-primary/50 bg-muted p-3 text-sm text-foreground">
           <p className="font-medium">Save your recovery codes</p>
           <p className="mt-1">Each one signs you in once if you lose your phone. They won&apos;t be shown again.</p>
         </div>

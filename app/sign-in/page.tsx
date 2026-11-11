@@ -21,7 +21,7 @@ export default async function SignInPage({
   const message = error ? (ERRORS[error.toLowerCase()] ?? "Sign-in didn't work. Please try again.") : null;
 
   return (
-    <AuthShell title="Sign in" description="For the Fountline Digital team, contractors and clients.">
+    <AuthShell title="Sign in">
       {message && (
         <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{message}</p>
       )}
