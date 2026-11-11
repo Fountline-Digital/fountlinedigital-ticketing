@@ -9,7 +9,6 @@ import { pk, timestamps } from "./columns";
 export type OrgSettings = {
   allowedGoogleDomains?: string[]; // e.g. ["fountlinedigital.com"]
   sessionMinutesByRole?: Partial<Record<"admin" | "manager" | "worker" | "contractor" | "client", number>>;
-  mfaRequiredRoles?: string[]; // admin is always required
   contractorDefaultAccessDays?: number;
   inviteExpiryHours?: number;
   trashRetentionDays?: number; // default 30

@@ -242,7 +242,6 @@ async function main() {
       timezone: "America/New_York",
       settings: {
         allowedGoogleDomains: ["fountlinedigital.com"],
-        mfaRequiredRoles: ["admin", "manager"],
         contractorDefaultAccessDays: 90,
         inviteExpiryHours: 72,
         trashRetentionDays: 30,
@@ -267,7 +266,7 @@ async function main() {
   if (adminEmail) {
     await db
       .insert(s.users)
-      .values({ email: adminEmail, name: process.env.SEED_ADMIN_NAME ?? null })
+      .values({ email: adminEmail, name: process.env.SEED_ADMIN_NAME ?? "" })
       .onConflictDoNothing({ target: s.users.email });
     const [admin] = await db.select().from(s.users).where(eq(s.users.email, adminEmail));
     const [membership] = await db

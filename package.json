@@ -11,16 +11,23 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
+    "better-auth": "^1.7.21",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.6",
+    "qrcode": "^1.5.4",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "resend": "^6.38.0",
+    "server-only": "^0.0.1",
+    "ws": "^8.22.2"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "^20",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/ws": "^8.18.2",
     "dotenv": "^18.0.10",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",

@@ -1,67 +1,77 @@
-// Auth.js (NextAuth v5) tables, shaped for @auth/drizzle-adapter.
-// Property names must stay as Auth.js expects; DB columns are snake_case.
-// Database sessions (not JWT) so admins can revoke sessions instantly.
+// Better Auth tables (user, session, account, verification) plus our two-factor table.
+// Property names must match Better Auth's field names; DB columns are snake_case.
+// Wired up in lib/auth.ts via drizzleAdapter(..., { schema: { user, session, account, verification } }).
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { boolean, integer, jsonb, pgTable, primaryKey, text, uuid } from "drizzle-orm/pg-core";
+import { boolean, index, jsonb, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
 import { pk, timestamps, ts } from "./columns";
 
 export const users = pgTable("users", {
   id: pk(),
-  name: text("name"),
+  name: text("name").notNull().default(""),
   email: text("email").notNull().unique(),
-  emailVerified: ts("email_verified").$type<Date>(),
+  emailVerified: boolean("email_verified").notNull().default(false),
   image: text("image"),
+  // Ours: users are deactivated, never deleted.
   isActive: boolean("is_active").notNull().default(true),
   lastSeenAt: ts("last_seen_at"),
   ...timestamps(),
 });
 
-export const accounts = pgTable(
-  "accounts",
+export const sessions = pgTable(
+  "sessions",
   {
+    id: pk(),
+    token: text("token").notNull().unique(),
     userId: uuid("user_id")
       .notNull()
       .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
-    type: text("type").notNull(),
-    provider: text("provider").notNull(),
-    providerAccountId: text("provider_account_id").notNull(),
-    refresh_token: text("refresh_token"),
-    access_token: text("access_token"),
-    expires_at: integer("expires_at"),
-    token_type: text("token_type"),
-    scope: text("scope"),
-    id_token: text("id_token"),
-    session_state: text("session_state"),
+    expiresAt: ts("expires_at").notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    // Ours: set once the user passes two-factor in this session.
+    mfaVerifiedAt: ts("mfa_verified_at"),
+    ...timestamps(),
   },
-  (t) => [primaryKey({ columns: [t.provider, t.providerAccountId] })],
+  (t) => [index("sessions_user_idx").on(t.userId)],
 );
 
-export const sessions = pgTable("sessions", {
-  sessionToken: text("session_token").primaryKey(),
-  userId: uuid("user_id")
-    .notNull()
-    .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
-  expires: ts("expires").notNull(),
-  // Extra columns for inactivity timeouts, "revoke all sessions" and the audit log.
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  lastActiveAt: ts("last_active_at").notNull().defaultNow(),
-  createdAt: ts("created_at").notNull().defaultNow(),
-});
-
-// Magic-link tokens (contractors and clients).
-export const verificationTokens = pgTable(
-  "verification_tokens",
+export const accounts = pgTable(
+  "accounts",
   {
-    identifier: text("identifier").notNull(),
-    token: text("token").notNull(),
-    expires: ts("expires").notNull(),
+    id: pk(),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    userId: uuid("user_id")
+      .notNull()
+      .references((): AnyPgColumn => users.id, { onDelete: "cascade" }),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    idToken: text("id_token"),
+    accessTokenExpiresAt: ts("access_token_expires_at"),
+    refreshTokenExpiresAt: ts("refresh_token_expires_at"),
+    scope: text("scope"),
+    password: text("password"),
+    ...timestamps(),
   },
-  (t) => [primaryKey({ columns: [t.identifier, t.token] })],
+  (t) => [unique("accounts_provider_account_uq").on(t.providerId, t.accountId)],
 );
 
-// Two-factor (TOTP) for roles that require it. Secret is encrypted in app code
-// before storage; recovery codes are stored hashed.
+// Magic-link tokens and other one-time values.
+export const verifications = pgTable(
+  "verifications",
+  {
+    id: pk(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    ...timestamps(),
+  },
+  (t) => [index("verifications_identifier_idx").on(t.identifier)],
+);
+
+// Two-factor (authenticator app), required for every user.
+// Secret is AES-256-GCM encrypted (lib/mfa.ts); recovery codes are stored hashed.
+// enabled_at is null while setup is in progress.
 export const userMfa = pgTable("user_mfa", {
   userId: uuid("user_id")
     .primaryKey()
@@ -69,6 +79,6 @@ export const userMfa = pgTable("user_mfa", {
   totpSecretEncrypted: text("totp_secret_encrypted").notNull(),
   recoveryCodesHashed: jsonb("recovery_codes_hashed").$type<string[]>().notNull().default([]),
   enabledAt: ts("enabled_at"),
-  lastUsedAt: ts("last_used_at"),
+  lastUsedAt: ts("last_used_at"), // blocks reusing the same code
   ...timestamps(),
 });
