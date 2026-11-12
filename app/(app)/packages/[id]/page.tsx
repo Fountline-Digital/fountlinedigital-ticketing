@@ -1,26 +1,21 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
-import { ArrowLeft } from "lucide-react";
 import { db } from "@/db";
-import { organizations, packageVersions, packages, serviceLines, tiers, users } from "@/db/schema";
+import { organizations, packageVersions, packages, serviceLines, users } from "@/db/schema";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDraft, getEditableVersion } from "@/lib/packages";
 import { requirePermission } from "@/lib/session";
-import { PackageStatusBadge } from "../status-badge";
 import { DetailsForm, VersionSettingsForm } from "./settings-forms";
-import { PublishBar, StatusActions } from "./package-actions";
 
 export default async function PackagePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await requirePermission("packages.manage");
 
   const [row] = await db
-    .select({ pkg: packages, lineName: serviceLines.name, lineCode: serviceLines.code, tierName: tiers.name })
+    .select({ pkg: packages, lineCode: serviceLines.code })
     .from(packages)
     .innerJoin(serviceLines, eq(serviceLines.id, packages.serviceLineId))
-    .innerJoin(tiers, eq(tiers.id, packages.tierId))
     .where(and(eq(packages.id, id), eq(packages.orgId, ctx.orgId)));
   if (!row) notFound();
   const { pkg } = row;
@@ -28,9 +23,6 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
   const [org] = await db.select().from(organizations).where(eq(organizations.id, ctx.orgId));
   const draft = await getDraft(pkg.id);
   const editable = await getEditableVersion(pkg.id);
-  const currentVersion = pkg.currentVersionId
-    ? (await db.select({ version: packageVersions.version }).from(packageVersions).where(eq(packageVersions.id, pkg.currentVersionId)))[0]?.version
-    : undefined;
 
   const history = await db
     .select({ v: packageVersions, by: users.name, byEmail: users.email })
@@ -42,34 +34,7 @@ export default async function PackagePage({ params }: { params: Promise<{ id: st
   const fmt = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: org.timezone });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <Link href="/packages" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="size-4" /> Packages
-      </Link>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{pkg.name}</h1>
-            <PackageStatusBadge status={pkg.status} />
-          </div>
-          <p className="text-sm text-muted-foreground">
-            <span className="font-mono">{pkg.key}</span> · {row.lineName} · {row.tierName}
-            {currentVersion && <> · live version <span className="font-mono">v{currentVersion}</span></>}
-          </p>
-        </div>
-        <StatusActions packageId={pkg.id} status={pkg.status} hasVersion={Boolean(pkg.currentVersionId)} />
-      </div>
-
-      {draft && <PublishBar packageId={pkg.id} version={draft.version} packageKey={pkg.key} />}
-
-      <nav className="flex gap-1 border-b text-sm">
-        <span className="border-b-2 border-primary px-3 py-2 font-medium">Settings</span>
-        <span className="px-3 py-2 text-muted-foreground">
-          Template <Badge variant="outline" className="ml-1">Soon</Badge>
-        </span>
-      </nav>
-
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Details</CardTitle>
