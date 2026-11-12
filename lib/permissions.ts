@@ -16,6 +16,7 @@ export const DEFAULT_PERMISSIONS = {
   "clients.view": ["admin", "manager", "worker"],
   "clients.manage": ["admin", "manager"],
   "projects.view_all": ["admin", "manager"],
+  "projects.manage": ["admin", "manager"],
   "tickets.view_all": ["admin", "manager"],
   "tickets.assign": ["admin", "manager"],
   "audit.view": ["admin"],

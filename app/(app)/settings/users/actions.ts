@@ -1,12 +1,11 @@
 "use server";
-import { randomBytes, createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { clientContacts, clients, invites, memberships, organizations, sessions, userMfa, users } from "@/db/schema";
+import { invites, memberships, organizations, sessions, userMfa } from "@/db/schema";
 import { audit } from "@/lib/audit";
-import { inviteEmail, sendEmail } from "@/lib/email";
-import { INVITABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/permissions";
+import { createInvite as createInviteRecord, sendInviteEmail } from "@/lib/invites";
+import { ROLE_LABELS, type Role } from "@/lib/permissions";
 import { requirePermission, type UserContext } from "@/lib/session";
 
 export type InviteState = { error?: string; ok?: string; at?: number };
@@ -38,31 +37,6 @@ async function orgSettings(orgId: string) {
   return org;
 }
 
-function appUrl() {
-  return process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
-}
-
-async function sendInviteEmail(ctx: UserContext, inviteId: string) {
-  const [invite] = await db.select().from(invites).where(eq(invites.id, inviteId));
-  const org = await orgSettings(ctx.orgId);
-  const domains = (org.settings.allowedGoogleDomains ?? []).map((d) => d.toLowerCase());
-  const usesGoogle = domains.includes(invite.email.split("@")[1] ?? "");
-  const expiresText = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: org.timezone }).format(invite.expiresAt);
-
-  await sendEmail(
-    invite.email,
-    `You're invited to ${org.name}`,
-    inviteEmail({
-      orgName: org.name,
-      inviterName: ctx.user.name || ctx.user.email,
-      roleLabel: ROLE_LABELS[invite.role as Role],
-      signInUrl: `${appUrl()}/sign-in?email=${encodeURIComponent(invite.email)}`,
-      usesGoogle,
-      expiresText,
-    }),
-  );
-}
-
 // Loads a membership only if it belongs to the acting user's org.
 async function membershipInOrg(ctx: UserContext, membershipId: string) {
   const [m] = await db
@@ -85,106 +59,26 @@ async function activeAdminCount(orgId: string) {
 
 export async function createInvite(_prev: InviteState, formData: FormData): Promise<InviteState> {
   const ctx = await requirePermission("users.invite");
-
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const role = String(formData.get("role") ?? "") as Role;
-  const clientId = String(formData.get("clientId") ?? "") || null;
-  const accessEnds = String(formData.get("accessEnds") ?? "") || null;
-  const contactName = String(formData.get("contactName") ?? "").trim();
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return { error: "Enter a valid email address." };
-  if (!ROLES.includes(role)) return { error: "Choose a role." };
-  if (!INVITABLE_ROLES[ctx.role].includes(role)) return { error: `You can't invite someone as ${ROLE_LABELS[role]}.` };
-  if (role === "client" && !clientId) return { error: "Choose which client this person belongs to." };
-
-  const org = await orgSettings(ctx.orgId);
-  const staffDomains = (org.settings.allowedGoogleDomains ?? []).map((d) => d.toLowerCase());
-  const isStaffEmail = staffDomains.includes(email.split("@")[1] ?? "");
-  if ((role === "admin" || role === "manager" || role === "worker") && !isStaffEmail) {
-    return { error: `Team roles need a ${staffDomains.map((d) => "@" + d).join(" or ")} address. Use Contractor for outside help.` };
-  }
-
-  if (clientId) {
-    const [client] = await db.select({ id: clients.id }).from(clients).where(and(eq(clients.id, clientId), eq(clients.orgId, ctx.orgId)));
-    if (!client) return { error: "That client wasn't found." };
-  }
-
-  // Already a member?
-  const [existingUser] = await db.select().from(users).where(eq(users.email, email));
-  if (existingUser) {
-    const [m] = await db
-      .select()
-      .from(memberships)
-      .where(and(eq(memberships.orgId, ctx.orgId), eq(memberships.userId, existingUser.id)));
-    if (m) return { error: `${email} already has access (${ROLE_LABELS[m.role as Role]}, ${m.status}).` };
-  }
-
-  // Replace any open invite for this email.
-  await db
-    .update(invites)
-    .set({ revokedAt: new Date() })
-    .where(and(eq(invites.orgId, ctx.orgId), eq(invites.email, email), isNull(invites.acceptedAt), isNull(invites.revokedAt)));
-
-  let accessExpiresAt: Date | null = null;
-  if (role === "contractor") {
-    accessExpiresAt = accessEnds
-      ? new Date(`${accessEnds}T23:59:59`)
-      : new Date(Date.now() + (org.settings.contractorDefaultAccessDays ?? 90) * 86_400_000);
-  }
-
-  const hours = org.settings.inviteExpiryHours ?? 72;
-  const [invite] = await db
-    .insert(invites)
-    .values({
-      orgId: ctx.orgId,
-      email,
-      role,
-      clientId: role === "client" ? clientId : null,
-      accessExpiresAt,
-      // The invite is accepted by signing in with this email; the token is only a unique reference.
-      tokenHash: createHash("sha256").update(randomBytes(32)).digest("hex"),
-      expiresAt: new Date(Date.now() + hours * 3_600_000),
-      invitedByUserId: ctx.user.id,
-    })
-    .returning();
-
-  if (role === "client" && clientId) {
-    const [contact] = await db
-      .select()
-      .from(clientContacts)
-      .where(and(eq(clientContacts.clientId, clientId), eq(clientContacts.email, email)));
-    const flags = {
-      isPrimary: checked(formData.get("isPrimary")),
-      isApprover: checked(formData.get("isApprover")),
-      isBilling: checked(formData.get("isBilling")),
-    };
-    if (contact) {
-      await db.update(clientContacts).set(flags).where(eq(clientContacts.id, contact.id));
-    } else {
-      await db.insert(clientContacts).values({ orgId: ctx.orgId, clientId, name: contactName || email, email, ...flags });
-    }
-  }
-
-  await audit({
-    orgId: ctx.orgId,
-    actorUserId: ctx.user.id,
-    actorRole: ctx.role,
-    action: "invite.create",
-    entityType: "invite",
-    entityId: invite.id,
-    changes: { after: { email, role, clientId, accessExpiresAt } },
+  const result = await createInviteRecord(ctx, {
+    email: String(formData.get("email") ?? ""),
+    role,
+    clientId: String(formData.get("clientId") ?? "") || null,
+    accessEnds: String(formData.get("accessEnds") ?? "") || null,
+    contact:
+      role === "client"
+        ? {
+            name: String(formData.get("contactName") ?? "").trim(),
+            isPrimary: checked(formData.get("isPrimary")),
+            isApprover: checked(formData.get("isApprover")),
+            isBilling: checked(formData.get("isBilling")),
+          }
+        : undefined,
   });
-
-  try {
-    await sendInviteEmail(ctx, invite.id);
-  } catch (err) {
-    console.error(err);
-    revalidatePath(PATH);
-    return { error: "Invite saved, but the email didn't send. Use Resend in the invites list.", at: Date.now() };
-  }
-
   revalidatePath(PATH);
-  return { ok: `Invite sent to ${email}.`, at: Date.now() };
+  // Validation problems show in the form; saved-but-not-emailed shows as a toast.
+  if (result.error && !result.error.startsWith("Invite saved")) return { error: result.error };
+  return { ...result, at: Date.now() };
 }
 
 export async function resendInvite(formData: FormData): Promise<ActionResult> {
