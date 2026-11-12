@@ -128,6 +128,9 @@ export function TicketFields(props: {
   statuses: ColorOption[];
   priorities: ColorOption[];
   assignees: { value: string; label: string }[];
+  teamRoleId: string | null;
+  teamRoles: ColorOption[];
+  canChangeTeam: boolean;
   context: {
     project: { id: string; label: string } | null;
     client: { id: string; label: string } | null;
@@ -139,6 +142,8 @@ export function TicketFields(props: {
   const [status, setStatus] = useState(props.statusId);
   const [priority, setPriority] = useState(props.priorityId);
   const [assignee, setAssignee] = useState(props.assigneeMembershipId ?? UNASSIGNED);
+  const [teamRole, setTeamRole] = useState(props.teamRoleId ?? UNASSIGNED);
+  const roleItems = [{ value: UNASSIGNED, label: "No team role", color: "transparent" }, ...props.teamRoles];
   const [due, setDue] = useState(props.dueDate);
   const [estimate, setEstimate] = useState(props.estimateHours);
   const [clientVisible, setClientVisible] = useState(props.isClientVisible);
@@ -166,6 +171,21 @@ export function TicketFields(props: {
             run(() => updateTicket(props.ticketId, { priorityId: v }), (r) => r.error && setPriority(props.priorityId), true);
           }}
         />
+        {props.teamRoles.length > 0 && (
+          <ColorSelect
+            label="Team role"
+            items={roleItems}
+            value={teamRole}
+            disabled={!props.canChangeTeam}
+            onChange={(v) => {
+              setTeamRole(v);
+              run(
+                () => updateTicket(props.ticketId, { teamRoleId: v === UNASSIGNED ? null : v }),
+                (r) => r.error && setTeamRole(props.teamRoleId ?? UNASSIGNED),
+              );
+            }}
+          />
+        )}
         <div className="grid gap-1.5">
           <Label>Assignee</Label>
           <Select

@@ -26,16 +26,20 @@ export function NewTicketDialog({
   projectId,
   phases,
   defaultTypeId,
+  teamRoles = [],
 }: {
   types: Option[];
   projectId?: string;
   phases?: Option[];
   defaultTypeId?: string;
+  teamRoles?: Option[];
 }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState<FormState, FormData>(createTicket, {});
   const [typeId, setTypeId] = useState(defaultTypeId ?? types[0]?.value ?? "");
   const [phaseId, setPhaseId] = useState(NO_PHASE);
+  const [teamRoleId, setTeamRoleId] = useState(NO_PHASE);
+  const roleItems = [{ value: NO_PHASE, label: "No team role" }, ...teamRoles];
   useFormToast(state);
   const phaseItems = [{ value: NO_PHASE, label: "No phase" }, ...(phases ?? [])];
 
@@ -54,6 +58,7 @@ export function NewTicketDialog({
           <input type="hidden" name="typeId" value={typeId} />
           <input type="hidden" name="projectId" value={projectId ?? ""} />
           <input type="hidden" name="phaseId" value={phaseId === NO_PHASE ? "" : phaseId} />
+          <input type="hidden" name="teamRoleId" value={teamRoleId === NO_PHASE ? "" : teamRoleId} />
           <div className="grid gap-2">
             <Label htmlFor="nt-title">Title</Label>
             <Input id="nt-title" name="title" required autoFocus />
@@ -92,6 +97,23 @@ export function NewTicketDialog({
               </div>
             )}
           </div>
+          {teamRoles.length > 0 && (
+            <div className="grid gap-2">
+              <Label>Team role</Label>
+              <Select items={roleItems} value={teamRoleId} onValueChange={(v) => setTeamRoleId(String(v ?? NO_PHASE))}>
+                <SelectTrigger className="w-full sm:w-1/2">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {roleItems.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid gap-2">
             <Label htmlFor="nt-desc">Description</Label>
             <Textarea id="nt-desc" name="description" rows={4} />

@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createInvite, type InviteState } from "./actions";
+import { TeamRolesPicker, type TeamRoleChoice, type TeamRoleSelection } from "./team-roles-picker";
 
 type Option = { value: string; label: string };
 
@@ -25,6 +26,7 @@ export function InviteDialog(props: {
   clients: Option[];
   staffDomains: string[];
   contractorDays: number;
+  teamRoles: TeamRoleChoice[];
 }) {
   const [open, setOpen] = useState(false);
   const [formKey, setFormKey] = useState(0);
@@ -57,17 +59,20 @@ function InviteForm({
   clients,
   staffDomains,
   contractorDays,
+  teamRoles,
   onDone,
 }: {
   roles: Option[];
   clients: Option[];
   staffDomains: string[];
   contractorDays: number;
+  teamRoles: TeamRoleChoice[];
   onDone: () => void;
 }) {
   const [state, action, pending] = useActionState<InviteState, FormData>(createInvite, {});
   const [role, setRole] = useState(roles.find((r) => r.value === "worker")?.value ?? roles[0]?.value ?? "");
   const isTeam = role === "admin" || role === "manager" || role === "worker";
+  const [teamSel, setTeamSel] = useState<TeamRoleSelection[]>([]);
 
   const handled = useRef<number | undefined>(undefined);
   useEffect(() => {
@@ -150,6 +155,14 @@ function InviteForm({
             </label>
           </div>
         </>
+      )}
+
+      {role !== "client" && teamRoles.length > 0 && (
+        <div className="grid gap-2">
+          <Label>Team roles</Label>
+          <input type="hidden" name="teamRoles" value={JSON.stringify(teamSel)} />
+          <TeamRolesPicker roles={teamRoles} value={teamSel} onChange={setTeamSel} allowLead={role !== "contractor"} />
+        </div>
       )}
 
       {state.error && !state.at && <p className="text-sm text-destructive">{state.error}</p>}

@@ -16,6 +16,7 @@ const FIELD_LABELS: Record<string, string> = {
   due: "due date",
   estimate: "estimate",
   clientVisible: "client visibility",
+  teamRole: "team role",
 };
 
 function describe(item: ActivityItem, memberName: Record<string, string>): string {
@@ -29,6 +30,7 @@ function describe(item: ActivityItem, memberName: Record<string, string>): strin
         const label = FIELD_LABELS[field] ?? field;
         if (field === "status" || field === "priority") return `set ${label} to ${String(value)}`;
         if (field === "assignee") return value === "Unassigned" ? "unassigned it" : `assigned it to ${memberName[String(value)] ?? String(value)}`;
+        if (field === "teamRole") return value === "None" ? "removed the team role" : `moved it to the ${String(value)} team`;
         if (field === "clientVisible") return value ? "made it visible to the client" : "hid it from the client";
         if (field === "due") return value ? `set the due date to ${String(value)}` : "cleared the due date";
         if (field === "estimate") return value === null ? "cleared the estimate" : `set the estimate to ${Math.round((Number(value) / 60) * 100) / 100} h`;

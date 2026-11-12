@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { clientContacts, clients, invites, memberships, organizations, users } from "@/db/schema";
+import { clientContacts, clients, invites, memberships, organizations, teamRoles, users } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { inviteEmail, sendEmail } from "@/lib/email";
 import { INVITABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/permissions";
@@ -15,6 +15,7 @@ export type InviteInput = {
   role: Role;
   clientId?: string | null;
   accessEnds?: string | null; // yyyy-mm-dd, contractors
+  teamRoles?: { teamRoleId: string; isLead: boolean }[]; // applied when the invite is accepted
   contact?: { name?: string; isPrimary: boolean; isApprover: boolean; isBilling: boolean };
 };
 
@@ -95,6 +96,17 @@ export async function createInvite(ctx: UserContext, input: InviteInput): Promis
       : new Date(Date.now() + (org.settings.contractorDefaultAccessDays ?? 90) * 86_400_000);
   }
 
+  // Team roles: only real roles in this org, never for clients, no leads for contractors
+  const validRoles = input.teamRoles?.length
+    ? await db.select({ id: teamRoles.id }).from(teamRoles).where(and(eq(teamRoles.orgId, ctx.orgId), eq(teamRoles.isActive, true)))
+    : [];
+  const inviteTeamRoles =
+    role === "client"
+      ? []
+      : (input.teamRoles ?? [])
+          .filter((r) => validRoles.some((v) => v.id === r.teamRoleId))
+          .map((r) => ({ teamRoleId: r.teamRoleId, isLead: role === "contractor" ? false : Boolean(r.isLead) }));
+
   const [invite] = await db
     .insert(invites)
     .values({
@@ -103,6 +115,7 @@ export async function createInvite(ctx: UserContext, input: InviteInput): Promis
       role,
       clientId: role === "client" ? clientId : null,
       accessExpiresAt,
+      teamRoles: inviteTeamRoles,
       // Accepted by signing in with this email; the token is only a unique reference.
       tokenHash: createHash("sha256").update(randomBytes(32)).digest("hex"),
       expiresAt: new Date(Date.now() + (org.settings.inviteExpiryHours ?? 72) * 3_600_000),

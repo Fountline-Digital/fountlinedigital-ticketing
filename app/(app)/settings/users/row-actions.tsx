@@ -1,6 +1,6 @@
 "use client";
 import { useState, useTransition } from "react";
-import { CalendarClock, LogOut, Mail, MoreHorizontal, ShieldOff, UserCheck, UserCog, UserX, X } from "lucide-react";
+import { CalendarClock, LogOut, Mail, MoreHorizontal, ShieldOff, UserCheck, UserCog, Users, UserX, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -37,9 +37,11 @@ import {
   revokeInvite,
   setAccessEnds,
   setActive,
+  setMemberTeamRoles,
   signOutEverywhere,
   type ActionResult,
 } from "./actions";
+import { TeamRolesPicker, type TeamRoleChoice, type TeamRoleSelection } from "./team-roles-picker";
 
 type ServerAction = (fd: FormData) => Promise<ActionResult>;
 
@@ -127,6 +129,8 @@ export function MemberActions({
   isContractor,
   accessEnds,
   roles,
+  teamRoles,
+  currentTeamRoles,
 }: {
   membershipId: string;
   name: string;
@@ -135,6 +139,8 @@ export function MemberActions({
   isContractor: boolean;
   accessEnds: string;
   roles: { value: string; label: string }[];
+  teamRoles: TeamRoleChoice[];
+  currentTeamRoles: TeamRoleSelection[];
 }) {
   const { pending, run } = useRunAction();
   const [confirm, setConfirm] = useState<Confirm | null>(null);
@@ -142,6 +148,8 @@ export function MemberActions({
   const [endsOpen, setEndsOpen] = useState(false);
   const [newRole, setNewRole] = useState(role);
   const [newEnds, setNewEnds] = useState(accessEnds);
+  const [teamOpen, setTeamOpen] = useState(false);
+  const [teamSel, setTeamSel] = useState<TeamRoleSelection[]>(currentTeamRoles);
   const id = { membershipId };
 
   return (
@@ -153,6 +161,17 @@ export function MemberActions({
             <DropdownMenuItem onClick={() => setRoleOpen(true)}>
               <UserCog />
               Change role
+            </DropdownMenuItem>
+          )}
+          {role !== "client" && (
+            <DropdownMenuItem
+              onClick={() => {
+                setTeamSel(currentTeamRoles);
+                setTeamOpen(true);
+              }}
+            >
+              <Users />
+              Team roles
             </DropdownMenuItem>
           )}
           {isContractor && (
@@ -235,6 +254,24 @@ export function MemberActions({
           </Select>
           <DialogFooter>
             <Button disabled={pending} onClick={() => run(changeRole, { ...id, role: newRole }, () => setRoleOpen(false))}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={teamOpen} onOpenChange={setTeamOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Team roles</DialogTitle>
+            <DialogDescription>
+              {name}&apos;s departments. Leads see and assign all of their department&apos;s work.
+              {isContractor && " Contractors can't be leads."}
+            </DialogDescription>
+          </DialogHeader>
+          <TeamRolesPicker roles={teamRoles} value={teamSel} onChange={setTeamSel} allowLead={!isContractor} />
+          <DialogFooter>
+            <Button disabled={pending} onClick={() => run(() => setMemberTeamRoles(membershipId, teamSel), {}, () => setTeamOpen(false))}>
               Save
             </Button>
           </DialogFooter>

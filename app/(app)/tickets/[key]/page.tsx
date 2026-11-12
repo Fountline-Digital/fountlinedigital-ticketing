@@ -8,10 +8,12 @@ import {
   clients,
   comments,
   memberships,
+  membershipTeamRoles,
   organizations,
   priorities,
   projectPhases,
   projects,
+  teamRoles,
   ticketChecklistItems,
   ticketLinks,
   ticketStatuses,
@@ -59,6 +61,20 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
     .innerJoin(users, eq(users.id, memberships.userId))
     .where(and(eq(memberships.orgId, ctx.orgId), eq(memberships.status, "active"), ne(memberships.role, "client")))
     .orderBy(asc(users.name));
+
+  const roles = await db
+    .select()
+    .from(teamRoles)
+    .where(and(eq(teamRoles.orgId, ctx.orgId), or(eq(teamRoles.isActive, true), t.teamRoleId ? eq(teamRoles.id, t.teamRoleId) : undefined)))
+    .orderBy(asc(teamRoles.sortOrder));
+  // Leads assigning within their team only see that team's people
+  const scopedMembers = access.assignScope
+    ? new Set(
+        (await db.select({ id: membershipTeamRoles.membershipId }).from(membershipTeamRoles).where(eq(membershipTeamRoles.teamRoleId, access.assignScope))).map(
+          (r) => r.id,
+        ),
+      )
+    : null;
 
   const [project] = t.projectId ? await db.select().from(projects).where(eq(projects.id, t.projectId)) : [];
   const [phase] = t.projectPhaseId ? await db.select().from(projectPhases).where(eq(projectPhases.id, t.projectPhaseId)) : [];
@@ -197,7 +213,12 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
             isClientVisible={t.isClientVisible}
             statuses={statusRows.map((s) => ({ value: s.id, label: s.name, color: s.color }))}
             priorities={priorityRows.map((p) => ({ value: p.id, label: p.name, color: p.color }))}
-            assignees={team.map((m) => ({ value: m.membershipId, label: m.name || m.email }))}
+            assignees={team
+              .filter((m) => !scopedMembers || scopedMembers.has(m.membershipId) || m.membershipId === t.assigneeMembershipId)
+              .map((m) => ({ value: m.membershipId, label: m.name || m.email }))}
+            teamRoleId={t.teamRoleId}
+            teamRoles={roles.map((r) => ({ value: r.id, label: r.name, color: r.color }))}
+            canChangeTeam={access.canAssign && !access.assignScope}
             context={{
               project: project ? { id: project.id, label: `${project.key} · ${project.name}` } : null,
               client: client ? { id: client.id, label: client.name } : null,

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { packages, phaseTemplates, taskTemplateDependencies, taskTemplates } from "@/db/schema";
 import { getDraft, getEditableVersion } from "@/lib/packages";
 import { requirePermission } from "@/lib/session";
+import { listTeamRoles } from "@/lib/team-roles";
 import { TemplateEditor, type PhaseData, type TaskData } from "./template-editor";
 
 export default async function TemplatePage({ params }: { params: Promise<{ id: string }> }) {
@@ -64,6 +65,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
     title: t.title,
     description: t.description ?? "",
     defaultRole: t.defaultRole ?? "worker",
+    teamRoleId: t.teamRoleId,
     estimateMinutes: t.estimateMinutes,
     isClientVisible: t.isClientVisible,
     checklist: t.checklist,
@@ -80,6 +82,7 @@ export default async function TemplatePage({ params }: { params: Promise<{ id: s
       phases={phaseData}
       tasks={taskData}
       copySources={copySources}
+      teamRoles={(await listTeamRoles(ctx.orgId)).map((r) => ({ value: r.id, label: r.name, color: r.color }))}
     />
   );
 }

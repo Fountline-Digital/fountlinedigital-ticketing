@@ -20,6 +20,7 @@ export type TaskData = {
   title: string;
   description: string;
   defaultRole: string;
+  teamRoleId: string | null;
   estimateMinutes: number | null;
   isClientVisible: boolean;
   checklist: string[];
@@ -49,3 +50,5 @@ export function useAction() {
   return { pending, run };
 }
 
+
+export type TeamRoleOption = { value: string; label: string; color: string };

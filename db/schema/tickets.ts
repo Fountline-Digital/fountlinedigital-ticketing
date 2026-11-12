@@ -21,6 +21,7 @@ import { clients } from "./clients";
 import { leadStages, lostReasons, priorities, ticketStatuses, ticketTypes } from "./config";
 import { taskTemplates } from "./packages";
 import { projectPhases, projects } from "./projects";
+import { teamRoles } from "./teams";
 
 export const tickets = pgTable(
   "tickets",
@@ -46,6 +47,7 @@ export const tickets = pgTable(
     projectId: uuid("project_id").references((): AnyPgColumn => projects.id, { onDelete: "set null" }),
     projectPhaseId: uuid("project_phase_id").references((): AnyPgColumn => projectPhases.id, { onDelete: "set null" }),
     taskTemplateId: uuid("task_template_id").references((): AnyPgColumn => taskTemplates.id, { onDelete: "set null" }),
+    teamRoleId: uuid("team_role_id").references((): AnyPgColumn => teamRoles.id, { onDelete: "set null" }),
 
     assigneeMembershipId: uuid("assignee_membership_id").references((): AnyPgColumn => memberships.id, {
       onDelete: "set null",
@@ -83,6 +85,7 @@ export const tickets = pgTable(
     index("tickets_project_idx").on(t.projectId),
     index("tickets_client_idx").on(t.clientId),
     index("tickets_due_idx").on(t.orgId, t.dueAt),
+    index("tickets_team_role_idx").on(t.orgId, t.teamRoleId),
   ],
 );
 

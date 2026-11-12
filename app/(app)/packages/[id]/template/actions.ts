@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray, max } from "drizzle-orm";
 import { db } from "@/db";
-import { packages, phaseTemplates, taskTemplateDependencies, taskTemplates, ticketTypes } from "@/db/schema";
+import { packages, phaseTemplates, taskTemplateDependencies, taskTemplates, teamRoles, ticketTypes } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { copyTemplate, ensureDraft } from "@/lib/packages";
 import { requirePermission, type UserContext } from "@/lib/session";
@@ -11,9 +11,7 @@ import { TemplateError, phaseInVersion, renumber, requireDraft, taskInVersion, w
 export type Result = { ok?: string; error?: string };
 
 const GATES = ["none", "manager", "client", "both"] as const;
-const ROLES = ["manager", "worker", "contractor"] as const;
 type Gate = (typeof GATES)[number];
-type TaskRole = (typeof ROLES)[number];
 
 /** Runs a template change with permission check, draft lookup, audit and refresh. */
 async function change(
@@ -154,20 +152,23 @@ export async function updateTask(
     title: string;
     description: string;
     phaseId: string;
-    defaultRole: string;
+    teamRoleId: string | null;
     estimateHours: string;
     isClientVisible: boolean;
     checklist: string;
     dependsOn: string[];
   },
 ): Promise<Result> {
-  return change(packageId, "update_task", async (_ctx, draft) => {
+  return change(packageId, "update_task", async (ctx, draft) => {
     const task = await taskInVersion(draft.id, taskId);
     await phaseInVersion(draft.id, input.phaseId);
 
     const title = clean(input.title);
     if (!title) throw new TemplateError("Give the task a title.");
-    if (!ROLES.includes(input.defaultRole as TaskRole)) throw new TemplateError("Choose a default role.");
+    if (input.teamRoleId) {
+      const [r] = await db.select().from(teamRoles).where(and(eq(teamRoles.id, input.teamRoleId), eq(teamRoles.orgId, ctx.orgId)));
+      if (!r) throw new TemplateError("Unknown team role.");
+    }
     const hours = clean(input.estimateHours);
     const estimateMinutes = hours === "" ? null : Math.round(Number(hours) * 60);
     if (estimateMinutes !== null && (!Number.isFinite(estimateMinutes) || estimateMinutes < 0))
@@ -200,7 +201,7 @@ export async function updateTask(
           description: clean(input.description) || null,
           phaseTemplateId: input.phaseId,
           position,
-          defaultRole: input.defaultRole as TaskRole,
+          teamRoleId: input.teamRoleId,
           estimateMinutes,
           isClientVisible: input.isClientVisible,
           checklist,

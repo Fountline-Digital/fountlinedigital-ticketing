@@ -25,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const admin = [
     ...(can["packages.manage"] ? [{ href: "/packages", label: "Packages", icon: "packages" as const }] : []),
     ...(can["users.view"] ? [{ href: "/settings/users", label: "Users & invites", icon: "users" as const }] : []),
+    ...(can["settings.manage"] ? [{ href: "/settings/team-roles", label: "Team roles", icon: "teams" as const }] : []),
     ...(can["settings.manage"] ? [{ href: "/settings/general", label: "Settings", icon: "settings" as const, soon: true }] : []),
   ];
   if (admin.length > 0) sections.push({ label: "Admin", items: admin });

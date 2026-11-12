@@ -6,7 +6,7 @@ import { magicLink } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { accounts, clientContacts, invites, memberships, organizations, sessions, users, verifications } from "@/db/schema";
+import { accounts, clientContacts, invites, memberships, membershipTeamRoles, organizations, sessions, users, verifications } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { magicLinkEmail, sendEmail } from "@/lib/email";
 
@@ -63,6 +63,19 @@ async function ensureAccess(userId: string) {
       })
       .onConflictDoNothing();
     await db.update(invites).set({ acceptedAt: new Date() }).where(eq(invites.id, invite.id));
+    // Team roles chosen on the invite
+    if (invite.teamRoles.length > 0) {
+      const [m] = await db
+        .select({ id: memberships.id })
+        .from(memberships)
+        .where(and(eq(memberships.orgId, invite.orgId), eq(memberships.userId, user.id)));
+      if (m) {
+        await db
+          .insert(membershipTeamRoles)
+          .values(invite.teamRoles.map((r) => ({ membershipId: m.id, teamRoleId: r.teamRoleId, isLead: r.isLead })))
+          .onConflictDoNothing();
+      }
+    }
     // Client invites: link the contact record created with the invite to this login.
     if (invite.clientId) {
       await db

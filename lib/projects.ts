@@ -22,6 +22,7 @@ import {
   tickets,
 } from "@/db/schema";
 import { nextNumber, nextTicketNumber, projectKey, ticketKey } from "@/lib/keys";
+import { pickAssignee } from "@/lib/team-roles";
 
 export class ProjectError extends Error {}
 
@@ -90,10 +91,19 @@ export async function createProjectFromPackage(input: NewProjectInput) {
     .select()
     .from(assignmentRules)
     .where(and(eq(assignmentRules.orgId, orgId), eq(assignmentRules.isActive, true), eq(assignmentRules.strategy, "fixed")));
-  const assigneeFor = (ticketTypeId: string | null) =>
+  const ruleAssignee = (ticketTypeId: string | null) =>
     rules.find((r) => r.serviceLineId === line.id && r.ticketTypeId === ticketTypeId)?.assigneeMembershipId ??
     rules.find((r) => r.serviceLineId === line.id && !r.ticketTypeId)?.assigneeMembershipId ??
     null;
+
+  // Who gets each task: an assignment rule if one matches, otherwise whoever has that
+  // task's team role and the fewest open tickets (counting tickets planned for this project).
+  const planned = new Map<string, number>();
+  const assigneeByTask = new Map<string, string | null>();
+  for (const t of tasks) {
+    const typeId = t.ticketTypeId ?? projectType.id;
+    assigneeByTask.set(t.id, ruleAssignee(typeId) ?? (await pickAssignee(orgId, t.teamRoleId, planned)));
+  }
 
   const year2 = new Date().getFullYear() % 100;
 
@@ -118,7 +128,12 @@ export async function createProjectFromPackage(input: NewProjectInput) {
       })
       .returning();
 
-    await tx.insert(projectMembers).values({ projectId: project.id, membershipId: input.creatorMembershipId }).onConflictDoNothing();
+    // The creator and everyone assigned a ticket are on the project team.
+    const team = new Set([input.creatorMembershipId, ...[...assigneeByTask.values()].filter((v): v is string => Boolean(v))]);
+    await tx
+      .insert(projectMembers)
+      .values([...team].map((membershipId) => ({ projectId: project.id, membershipId })))
+      .onConflictDoNothing();
 
     const ticketByTask = new Map<string, string>();
     for (const [i, pt] of phases.entries()) {
@@ -157,7 +172,8 @@ export async function createProjectFromPackage(input: NewProjectInput) {
             projectId: project.id,
             projectPhaseId: phase.id,
             taskTemplateId: t.id,
-            assigneeMembershipId: assigneeFor(typeId),
+            teamRoleId: t.teamRoleId,
+            assigneeMembershipId: assigneeByTask.get(t.id) ?? null,
             reporterUserId: input.createdByUserId,
             estimateMinutes: t.estimateMinutes,
             isClientVisible: t.isClientVisible,

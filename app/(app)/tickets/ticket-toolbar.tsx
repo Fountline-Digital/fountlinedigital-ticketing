@@ -77,7 +77,7 @@ export function TicketToolbar({
 }: {
   view: "list" | "board";
   filters: TicketFilters;
-  options: { statuses: Option[]; priorities: Option[]; types: Option[]; team: Option[]; projects: Option[] };
+  options: { statuses: Option[]; priorities: Option[]; types: Option[]; team: Option[]; projects: Option[]; teamRoles: Option[] };
   savedViews: SavedView[];
   canShare: boolean;
 }) {
@@ -221,6 +221,22 @@ export function TicketToolbar({
           onChange={(v) => setParam("assignee", v)}
           items={[{ value: ANY, label: "Anyone" }, { value: "me", label: "Me" }, { value: "none", label: "Unassigned" }, "sep", ...options.team]}
         />
+        <FilterSelect
+          label="Due"
+          value={filters.due ?? ANY}
+          onChange={(v) => setParam("due", v)}
+          items={[{ value: ANY, label: "Any due date" }, { value: "overdue", label: "Overdue" }, { value: "week", label: "Due in 7 days" }]}
+          width="w-36"
+        />
+        {options.teamRoles.length > 0 && (
+          <FilterSelect
+            label="Team role"
+            value={filters.teamRole ?? ANY}
+            onChange={(v) => setParam("teamRole", v)}
+            items={[{ value: ANY, label: "Any team" }, { value: "none", label: "No team role" }, "sep", ...options.teamRoles]}
+            width="w-36"
+          />
+        )}
         <FilterSelect
           label="Type"
           value={filters.type ?? ANY}

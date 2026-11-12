@@ -16,6 +16,8 @@ import {
   ticketChecklistItems,
   ticketLinks,
   ticketStatuses,
+  membershipTeamRoles,
+  teamRoles,
   ticketTypes,
   tickets,
   users,
@@ -74,6 +76,7 @@ export type TicketPatch = {
   statusId?: string;
   priorityId?: string;
   assigneeMembershipId?: string | null;
+  teamRoleId?: string | null;
   dueDate?: string | null; // yyyy-mm-dd
   estimateHours?: string;
   isClientVisible?: boolean;
@@ -124,6 +127,18 @@ export async function updateTicket(ticketId: string, patch: TicketPatch): Promis
     note("priority", old?.name, p.name);
   }
 
+  if (patch.teamRoleId !== undefined && patch.teamRoleId !== t.teamRoleId) {
+    if (!access.canAssign || access.assignScope) return { error: "Only admins and managers can move a ticket to another team." };
+    let label = "None";
+    if (patch.teamRoleId) {
+      const [r] = await db.select().from(teamRoles).where(and(eq(teamRoles.id, patch.teamRoleId), eq(teamRoles.orgId, ctx.orgId)));
+      if (!r) return { error: "Unknown team role." };
+      label = r.name;
+    }
+    set.teamRoleId = patch.teamRoleId;
+    note("teamRole", t.teamRoleId, label);
+  }
+
   let newAssigneeUserId: string | null = null;
   if (patch.assigneeMembershipId !== undefined && patch.assigneeMembershipId !== t.assigneeMembershipId) {
     if (!access.canAssign) return { error: "You can't reassign tickets." };
@@ -134,6 +149,13 @@ export async function updateTicket(ticketId: string, patch: TicketPatch): Promis
         .innerJoin(users, eq(users.id, memberships.userId))
         .where(and(eq(memberships.id, patch.assigneeMembershipId), eq(memberships.orgId, ctx.orgId), eq(memberships.status, "active")));
       if (!m || m.m.role === "client") return { error: "Choose an active team member." };
+      if (access.assignScope) {
+        const [inTeam] = await db
+          .select()
+          .from(membershipTeamRoles)
+          .where(and(eq(membershipTeamRoles.membershipId, m.m.id), eq(membershipTeamRoles.teamRoleId, access.assignScope)));
+        if (!inTeam) return { error: "As a team lead you can only assign people in your team." };
+      }
       newAssigneeUserId = m.m.userId;
       note("assignee", t.assigneeMembershipId, m.name || m.email);
       // Assigning someone to a project ticket puts them on the project so they can see it.
@@ -338,7 +360,12 @@ export async function createTicket(_prev: FormState, formData: FormData): Promis
   const projectId = String(formData.get("projectId") ?? "") || null;
   const phaseId = String(formData.get("phaseId") ?? "") || null;
   const description = String(formData.get("description") ?? "").trim() || null;
+  const teamRoleId = String(formData.get("teamRoleId") ?? "") || null;
   if (!title) return fail("Give the ticket a title.");
+  if (teamRoleId) {
+    const [r] = await db.select().from(teamRoles).where(and(eq(teamRoles.id, teamRoleId), eq(teamRoles.orgId, ctx.orgId)));
+    if (!r) return fail("Unknown team role.");
+  }
   if (ctx.role === "client") return fail("Not allowed.");
 
   const [type] = await db.select().from(ticketTypes).where(and(eq(ticketTypes.id, typeId), eq(ticketTypes.orgId, ctx.orgId)));
@@ -382,6 +409,7 @@ export async function createTicket(_prev: FormState, formData: FormData): Promis
         clientId,
         projectId,
         projectPhaseId: phaseId,
+        teamRoleId,
         assigneeMembershipId: ctx.membership.id,
         reporterUserId: ctx.user.id,
       })

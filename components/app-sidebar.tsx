@@ -10,6 +10,7 @@ import {
   Package,
   Settings,
   Ticket,
+  UsersRound,
   Users,
   type LucideIcon,
 } from "lucide-react";
@@ -38,7 +39,7 @@ import {
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 
-export type NavIcon = "dashboard" | "tickets" | "projects" | "clients" | "packages" | "users" | "settings";
+export type NavIcon = "dashboard" | "tickets" | "projects" | "clients" | "packages" | "users" | "teams" | "settings";
 export type NavItem = { href: string; label: string; icon: NavIcon; soon?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
@@ -49,6 +50,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   clients: Building2,
   packages: Package,
   users: Users,
+  teams: UsersRound,
   settings: Settings,
 };
 

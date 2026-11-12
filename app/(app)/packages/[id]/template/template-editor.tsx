@@ -32,7 +32,7 @@ import {
   startEditing,
 } from "./actions";
 import { ConfirmDelete, CopyFromDialog, PhaseDialog, TaskDialog } from "./template-dialogs";
-import { GATE_LABELS, ROLE_LABELS, hours, useAction, type PhaseData, type TaskData } from "./template-shared";
+import { GATE_LABELS, hours, useAction, type PhaseData, type TaskData, type TeamRoleOption } from "./template-shared";
 
 export type { PhaseData, TaskData };
 
@@ -45,6 +45,7 @@ export function TemplateEditor(props: {
   phases: PhaseData[];
   tasks: TaskData[];
   copySources: { id: string; label: string; phases: number }[];
+  teamRoles: TeamRoleOption[];
 }) {
   const { packageId, isDraft } = props;
   const [phases, setPhases] = useState(props.phases);
@@ -90,7 +91,7 @@ export function TemplateEditor(props: {
         <TemplateSummary phases={phases.length} tasks={tasks.length} minutes={totalMinutes} />
         {phases.length === 0 && <EmptyState />}
         {phases.map((p) => (
-          <PhaseCard key={p.id} {...{ phase: p, tasks: tasks.filter((t) => t.phaseId === p.id), allTasks: tasks, phases, packageId, readOnly: true, defaultRevisionRounds: props.defaultRevisionRounds, setTasks }} />
+          <PhaseCard key={p.id} {...{ phase: p, tasks: tasks.filter((t) => t.phaseId === p.id), allTasks: tasks, phases, packageId, readOnly: true, defaultRevisionRounds: props.defaultRevisionRounds, setTasks, teamRoles: props.teamRoles }} />
         ))}
       </div>
     );
@@ -126,6 +127,7 @@ export function TemplateEditor(props: {
                     defaultRevisionRounds={props.defaultRevisionRounds}
                     setTasks={setTasks}
                     handle={handle}
+                    teamRoles={props.teamRoles}
                   />
                 )}
               </SortablePhase>
@@ -218,6 +220,7 @@ function PhaseCard({
   defaultRevisionRounds,
   setTasks,
   handle,
+  teamRoles,
 }: {
   phase: PhaseData;
   tasks: TaskData[];
@@ -228,6 +231,7 @@ function PhaseCard({
   defaultRevisionRounds: number;
   setTasks: React.Dispatch<React.SetStateAction<TaskData[]>>;
   handle?: Handle;
+  teamRoles: TeamRoleOption[];
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -287,13 +291,13 @@ function PhaseCard({
 
       <CardContent className="space-y-2">
         {readOnly ? (
-          tasks.map((t) => <TaskRow key={t.id} task={t} allTasks={allTasks} />)
+          tasks.map((t) => <TaskRow key={t.id} task={t} allTasks={allTasks} teamRoles={teamRoles} />)
         ) : (
           <DndContext id={`tasks-${phase.id}`} sensors={sensors} collisionDetection={closestCenter} onDragEnd={onTaskDragEnd}>
             <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
               {tasks.map((t) => (
                 <SortableTask key={t.id} id={t.id}>
-                  {(h) => <TaskRow task={t} allTasks={allTasks} handle={h} onOpen={() => setEditing(t)} />}
+                  {(h) => <TaskRow task={t} allTasks={allTasks} teamRoles={teamRoles} handle={h} onOpen={() => setEditing(t)} />}
                 </SortableTask>
               ))}
             </SortableContext>
@@ -338,6 +342,7 @@ function PhaseCard({
               task={editing}
               phases={phases}
               allTasks={allTasks}
+              teamRoles={teamRoles}
               onDelete={() => run(() => deleteTask(packageId, editing.id), () => setEditing(null))}
             />
           )}
@@ -360,7 +365,20 @@ function SortableTask({ id, children }: { id: string; children: (handle: Handle)
   );
 }
 
-function TaskRow({ task, allTasks, handle, onOpen }: { task: TaskData; allTasks: TaskData[]; handle?: Handle; onOpen?: () => void }) {
+function TaskRow({
+  task,
+  allTasks,
+  teamRoles,
+  handle,
+  onOpen,
+}: {
+  task: TaskData;
+  allTasks: TaskData[];
+  teamRoles: TeamRoleOption[];
+  handle?: Handle;
+  onOpen?: () => void;
+}) {
+  const role = teamRoles.find((r) => r.value === task.teamRoleId);
   const depCodes = task.dependsOn.map((id) => allTasks.find((t) => t.id === id)?.code).filter(Boolean);
   return (
     <div className="flex items-center gap-2 rounded-lg border bg-black px-2 py-2">
@@ -374,7 +392,14 @@ function TaskRow({ task, allTasks, handle, onOpen }: { task: TaskData; allTasks:
         <span className="font-mono text-xs text-muted-foreground">{task.code}</span>
         <span className="min-w-0 flex-1 truncate text-sm font-medium">{task.title}</span>
         <span className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <span>{ROLE_LABELS[task.defaultRole] ?? task.defaultRole}</span>
+          {role ? (
+            <span className="inline-flex items-center gap-1">
+              <span className="size-2 rounded-full" style={{ backgroundColor: role.color }} />
+              {role.label}
+            </span>
+          ) : (
+            <span>No team role</span>
+          )}
           {task.estimateMinutes !== null && (
             <span className="inline-flex items-center gap-1">
               <Clock className="size-3" />

@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, desc, eq, ilike, inArray, isNull, notInArray, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, memberships, priorities, projectMembers, projects, ticketStatuses, ticketTypes, tickets, users } from "@/db/schema";
+import { clients, memberships, priorities, projectMembers, projects, teamRoles, ticketStatuses, ticketTypes, tickets, users } from "@/db/schema";
 
 export type TicketFilters = {
   q?: string;
@@ -10,10 +10,12 @@ export type TicketFilters = {
   assignee?: string; // "me", "none", or a membership id
   type?: string;
   project?: string;
+  teamRole?: string; // team role id, or "none"
+  due?: "overdue" | "week";
   sort?: "updated" | "due" | "priority" | "key";
 };
 
-export const FILTER_KEYS = ["q", "status", "priority", "assignee", "type", "project", "sort"] as const;
+export const FILTER_KEYS = ["q", "status", "priority", "assignee", "type", "project", "teamRole", "due", "sort"] as const;
 
 export function parseFilters(sp: Record<string, string | string[] | undefined>): TicketFilters {
   const get = (k: string) => {
@@ -21,13 +23,16 @@ export function parseFilters(sp: Record<string, string | string[] | undefined>):
     return (Array.isArray(v) ? v[0] : v)?.trim() || undefined;
   };
   const sort = get("sort");
+  const due = get("due");
   return {
+    due: due === "overdue" || due === "week" ? due : undefined,
     q: get("q"),
     status: get("status") ?? "open",
     priority: get("priority"),
     assignee: get("assignee"),
     type: get("type"),
     project: get("project"),
+    teamRole: get("teamRole"),
     sort: sort === "due" || sort === "priority" || sort === "key" ? sort : "updated",
   };
 }
@@ -41,6 +46,7 @@ export async function findTickets(opts: {
   membershipId: string;
   userId: string;
   viewAll: boolean;
+  leadRoleIds?: string[];
   filters: TicketFilters;
   board?: boolean;
   limit?: number;
@@ -56,6 +62,7 @@ export async function findTickets(opts: {
         eq(tickets.assigneeMembershipId, opts.membershipId),
         eq(tickets.reporterUserId, opts.userId),
         projectIds.length ? inArray(tickets.projectId, projectIds) : undefined,
+        opts.leadRoleIds?.length ? inArray(tickets.teamRoleId, opts.leadRoleIds) : undefined,
       ),
     );
   }
@@ -73,9 +80,13 @@ export async function findTickets(opts: {
   else if (f.status === "done") where.push(inArray(ticketStatuses.category, ["done", "cancelled"]));
   else if (f.status && f.status !== "all") where.push(eq(tickets.statusId, f.status));
 
+  if (f.due === "overdue") where.push(sql`${tickets.dueAt} < now()`);
+  if (f.due === "week") where.push(sql`${tickets.dueAt} >= now() and ${tickets.dueAt} <= now() + interval '7 days'`);
   if (f.priority) where.push(eq(tickets.priorityId, f.priority));
   if (f.type) where.push(eq(tickets.ticketTypeId, f.type));
   if (f.project) where.push(eq(tickets.projectId, f.project));
+  if (f.teamRole === "none") where.push(isNull(tickets.teamRoleId));
+  else if (f.teamRole) where.push(eq(tickets.teamRoleId, f.teamRole));
   if (f.assignee === "me") where.push(eq(tickets.assigneeMembershipId, opts.membershipId));
   else if (f.assignee === "none") where.push(isNull(tickets.assigneeMembershipId));
   else if (f.assignee) where.push(eq(tickets.assigneeMembershipId, f.assignee));
@@ -115,6 +126,8 @@ export async function findTickets(opts: {
       priorityColor: priorities.color,
       prioritySort: priorities.sortOrder,
       typeName: ticketTypes.name,
+      teamRoleName: teamRoles.name,
+      teamRoleColor: teamRoles.color,
       dueAt: tickets.dueAt,
       updatedAt: tickets.updatedAt,
       isClientVisible: tickets.isClientVisible,
@@ -131,6 +144,7 @@ export async function findTickets(opts: {
     .innerJoin(ticketTypes, eq(ticketTypes.id, tickets.ticketTypeId))
     .leftJoin(projects, eq(projects.id, tickets.projectId))
     .leftJoin(clients, eq(clients.id, tickets.clientId))
+    .leftJoin(teamRoles, eq(teamRoles.id, tickets.teamRoleId))
     .leftJoin(memberships, eq(memberships.id, tickets.assigneeMembershipId))
     .leftJoin(users, eq(users.id, memberships.userId))
     .where(and(...where))
@@ -175,7 +189,14 @@ export async function filterOptions(orgId: string, viewAll: boolean, membershipI
     projectRows = projectRows.filter((p) => mine.has(p.id));
   }
 
+  const roleRows = await db
+    .select()
+    .from(teamRoles)
+    .where(and(eq(teamRoles.orgId, orgId), eq(teamRoles.isActive, true)))
+    .orderBy(asc(teamRoles.sortOrder), asc(teamRoles.name));
+
   return {
+    teamRoles: roleRows.map((r) => ({ value: r.id, label: r.name })),
     statuses: statusRows.map((s) => ({ value: s.id, label: s.name, color: s.color, category: s.category })),
     priorities: priorityRows.map((p) => ({ value: p.id, label: p.name, color: p.color })),
     types: typeRows.map((t) => ({ value: t.id, label: t.name, kind: t.kind })),

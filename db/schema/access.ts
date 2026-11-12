@@ -3,6 +3,7 @@
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import {
   boolean,
+  jsonb,
   index,
   integer,
   pgTable,
@@ -56,6 +57,7 @@ export const invites = pgTable(
     clientId: uuid("client_id").references((): AnyPgColumn => clients.id, { onDelete: "cascade" }),
     accessExpiresAt: ts("access_expires_at"),
     tokenHash: text("token_hash").notNull().unique(),
+    teamRoles: jsonb("team_roles").$type<{ teamRoleId: string; isLead: boolean }[]>().notNull().default([]),
     expiresAt: ts("expires_at").notNull(),
     acceptedAt: ts("accepted_at"),
     revokedAt: ts("revoked_at"),

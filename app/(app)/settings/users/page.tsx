@@ -1,12 +1,13 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { clients, invites, memberships, organizations, userMfa, users } from "@/db/schema";
+import { clients, invites, memberships, membershipTeamRoles, organizations, userMfa, users } from "@/db/schema";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { can, INVITABLE_ROLES, ROLE_LABELS, type Role } from "@/lib/permissions";
 import { requirePermission } from "@/lib/session";
+import { listTeamRoles } from "@/lib/team-roles";
 import { InviteDialog } from "./invite-form";
 import { InviteActions, MemberActions } from "./row-actions";
 
@@ -60,6 +61,16 @@ export default async function UsersPage() {
     .where(and(eq(clients.orgId, ctx.orgId), isNull(clients.deletedAt)))
     .orderBy(asc(clients.name));
 
+  const roles = await listTeamRoles(ctx.orgId);
+  const memberRoles = members.length
+    ? await db
+        .select()
+        .from(membershipTeamRoles)
+        .where(inArray(membershipTeamRoles.membershipId, members.map((m) => m.id)))
+    : [];
+  const roleById = new Map(roles.map((r) => [r.id, r] as const));
+  const teamRoleChoices = roles.map((r) => ({ value: r.id, label: r.name, color: r.color }));
+
   const roleOptions = INVITABLE_ROLES[ctx.role].map((r) => ({ value: r, label: ROLE_LABELS[r] }));
   const teamRoleOptions = (["admin", "manager", "worker", "contractor"] as Role[]).map((r) => ({ value: r, label: ROLE_LABELS[r] }));
 
@@ -75,6 +86,7 @@ export default async function UsersPage() {
               clients={clientOptions}
               staffDomains={org.settings.allowedGoogleDomains ?? []}
               contractorDays={org.settings.contractorDefaultAccessDays ?? 90}
+              teamRoles={teamRoleChoices}
             />
           )
         }
@@ -131,7 +143,8 @@ export default async function UsersPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Role</TableHead>
+                <TableHead>Access</TableHead>
+                <TableHead className="hidden md:table-cell">Team roles</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Two-factor</TableHead>
                 <TableHead className="hidden lg:table-cell">Access ends</TableHead>
@@ -156,6 +169,19 @@ export default async function UsersPage() {
                       <div className="flex flex-col gap-0.5">
                         <span>{ROLE_LABELS[m.role as Role]}</span>
                         {m.clientName && <span className="text-xs text-muted-foreground">{m.clientName}</span>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <div className="flex flex-wrap gap-1">
+                        {memberRoles
+                          .filter((r) => r.membershipId === m.id && roleById.has(r.teamRoleId))
+                          .map((r) => (
+                            <Badge key={r.teamRoleId} variant={r.isLead ? "default" : "outline"}>
+                              <span className="size-2 rounded-full" style={{ backgroundColor: roleById.get(r.teamRoleId)!.color }} />
+                              {roleById.get(r.teamRoleId)!.name}
+                              {r.isLead && " lead"}
+                            </Badge>
+                          ))}
                       </div>
                     </TableCell>
                     <TableCell>
@@ -186,6 +212,8 @@ export default async function UsersPage() {
                           isContractor={m.role === "contractor"}
                           accessEnds={m.accessExpiresAt ? m.accessExpiresAt.toISOString().slice(0, 10) : ""}
                           roles={m.role === "client" ? [] : teamRoleOptions}
+                          teamRoles={m.role === "client" ? [] : teamRoleChoices}
+                          currentTeamRoles={memberRoles.filter((r) => r.membershipId === m.id).map((r) => ({ teamRoleId: r.teamRoleId, isLead: r.isLead }))}
                         />
                       )}
                     </TableCell>

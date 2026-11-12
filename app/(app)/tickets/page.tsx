@@ -4,6 +4,7 @@ import { savedFilters } from "@/db/schema";
 import { PageHeader } from "@/components/page-header";
 import { can, type Role } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
+import { leadRoleIds } from "@/lib/team-roles";
 import { NewTicketDialog } from "./new-ticket-dialog";
 import { filterOptions, findTickets, parseFilters } from "./query";
 import { TicketBoard } from "./ticket-board";
@@ -15,12 +16,13 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
   const { user, membership } = await requireUser();
   const orgId = membership.orgId;
   const viewAll = await can(orgId, membership.role as Role, "tickets.view_all");
+  const leads = membership.role === "contractor" ? [] : await leadRoleIds(membership.id);
   if (membership.role === "client") return null;
 
   const view = sp.view === "board" ? "board" : "list";
   const filters = parseFilters(sp);
   const [rows, options] = await Promise.all([
-    findTickets({ orgId, membershipId: membership.id, userId: user.id, viewAll, filters, board: view === "board", limit: view === "board" ? 400 : 200 }),
+    findTickets({ orgId, membershipId: membership.id, userId: user.id, viewAll, leadRoleIds: leads, filters, board: view === "board", limit: view === "board" ? 400 : 200 }),
     filterOptions(orgId, viewAll, membership.id),
   ]);
 
@@ -34,11 +36,18 @@ export default async function TicketsPage({ searchParams }: { searchParams: Prom
     <div className="mx-auto max-w-7xl space-y-5">
       <PageHeader
         title="Tickets"
-        description={viewAll ? "All tickets across clients and projects." : "Tickets on your projects, assigned to you, or created by you."}
+        description={
+          viewAll
+            ? "All tickets across clients and projects."
+            : leads.length
+              ? "Your department's tickets, plus tickets on your projects, assigned to you, or created by you."
+              : "Tickets on your projects, assigned to you, or created by you."
+        }
         actions={
           <NewTicketDialog
             types={options.types.filter((t) => t.kind !== "lead").map((t) => ({ value: t.value, label: t.label }))}
             defaultTypeId={options.types.find((t) => t.kind === "internal")?.value}
+            teamRoles={options.teamRoles}
           />
         }
       />

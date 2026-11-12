@@ -7,7 +7,7 @@ import { audit } from "@/lib/audit";
 import { requireUser } from "@/lib/session";
 import type { Result } from "./actions";
 
-const ALLOWED = ["q", "status", "priority", "assignee", "type", "project", "sort"];
+const ALLOWED = ["q", "status", "priority", "assignee", "type", "project", "teamRole", "due", "sort"];
 
 export async function saveView(name: string, isShared: boolean, view: "list" | "board", filters: Record<string, string>): Promise<Result> {
   const { user, membership } = await requireUser();

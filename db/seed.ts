@@ -219,6 +219,25 @@ const INTAKE_QUESTIONS = [
 
 const DESIGN_NAMES = ["Harbor", "Summit", "Meridian", "Coastal", "Foundry"];
 
+// Starter team roles (editable in Team roles)
+const TEAM_ROLES = [
+  { key: "sales", name: "Sales", description: "Leads, proposals and conversions", color: "#c0c0c0", widgets: ["lead_pipeline", "waiting_on_client"] },
+  { key: "design", name: "Design", description: "Graphic, brand, UI, logos and mockups", color: "#e5e5e5", widgets: ["waiting_on_client", "approvals"] },
+  { key: "development", name: "Development", description: "Websites and apps, builds and launches", color: "#a3a3a3", widgets: ["blocked", "launches"] },
+  { key: "support", name: "Support", description: "Maintenance plans and support requests", color: "#d4d4d4", widgets: ["response_targets", "waiting_on_client"] },
+  { key: "content", name: "Content", description: "Copywriting, SEO and page content", color: "#8c8c8c", widgets: ["waiting_on_client", "blocked"] },
+] as const;
+
+// Web Business task code -> team role
+const TASK_TEAM: Record<string, string> = {
+  "1.02": "content", "1.03": "content",
+  "2.01": "design", "2.02": "design", "2.03": "design", "2.04": "design",
+  "3.01": "development", "3.02": "development", "3.03": "content", "3.04": "development", "3.05": "content",
+  "4.01": "development", "4.03": "development",
+  "5.01": "development", "5.02": "development", "5.03": "development",
+  "6.01": "support", "6.02": "support",
+};
+
 // ---------------------------------------------------------------------------
 
 async function main() {
@@ -260,20 +279,19 @@ async function main() {
   const withOrder = <T extends object>(items: readonly T[]) =>
     items.map((item, i) => ({ ...item, orgId, sortOrder: i }));
 
-  // Admin user (optional) ----------------------------------------------------
-  let adminMembershipId: string | null = null;
+  // Admin invite (optional) --------------------------------------------------
+  // An invite, not a user: your first Google sign-in creates the account and
+  // accepts the invite, so there's no pre-made account to link.
+  const adminMembershipId: string | null = null;
   const adminEmail = process.env.SEED_ADMIN_EMAIL?.trim().toLowerCase();
   if (adminEmail) {
-    await db
-      .insert(s.users)
-      .values({ email: adminEmail, name: process.env.SEED_ADMIN_NAME ?? "" })
-      .onConflictDoNothing({ target: s.users.email });
-    const [admin] = await db.select().from(s.users).where(eq(s.users.email, adminEmail));
-    const [membership] = await db
-      .insert(s.memberships)
-      .values({ orgId, userId: admin.id, role: "admin", status: "active" })
-      .returning();
-    adminMembershipId = membership.id;
+    await db.insert(s.invites).values({
+      orgId,
+      email: adminEmail,
+      role: "admin",
+      tokenHash: `seed-${crypto.randomUUID()}`,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    });
   }
 
   // Lookups --------------------------------------------------------------------
@@ -285,6 +303,12 @@ async function main() {
   const leadStages = await db.insert(s.leadStages).values(withOrder(LEAD_STAGES)).returning();
   await db.insert(s.lostReasons).values(withOrder(LOST_REASONS));
   await db.insert(s.phaseNames).values(withOrder(PHASE_NAMES));
+
+  const roleRows = await db
+    .insert(s.teamRoles)
+    .values(TEAM_ROLES.map((r, i) => ({ orgId, key: r.key, name: r.name, description: r.description, color: r.color, widgets: [...r.widgets], sortOrder: i })))
+    .returning();
+  const teamRoleFor = (code: string) => roleRows.find((r) => r.key === TASK_TEAM[code])?.id ?? null;
 
   const line = (code: string) => serviceLines.find((r) => r.code === code)!;
   const status = (name: string) => statuses.find((r) => r.name === name)!;
@@ -427,6 +451,7 @@ async function main() {
           title: t.title,
           ticketTypeId: type("project_task").id,
           defaultRole: t.role ?? "worker",
+          teamRoleId: teamRoleFor(t.code),
           estimateMinutes: t.estimateMinutes,
           checklist: t.checklist ?? [],
           isClientVisible: t.clientVisible ?? false,
@@ -557,6 +582,7 @@ async function main() {
           projectId: project.id,
           projectPhaseId: phase.id,
           taskTemplateId: taskTemplateIdByCode.get(task.code)!,
+          teamRoleId: teamRoleFor(task.code),
           assigneeMembershipId: adminMembershipId,
           estimateMinutes: task.estimateMinutes,
           isClientVisible: task.clientVisible ?? false,
@@ -642,7 +668,7 @@ async function main() {
   Demo client:   ${client.key}
   Demo project:  ${project.key}
   Tickets:       ${P}T-1001 to ${P}T-${ticketNumber}
-  Admin:         ${adminEmail ?? "none (set SEED_ADMIN_EMAIL to create your account)"}
+  Admin invite:  ${adminEmail ?? "none (set SEED_ADMIN_EMAIL)"} (sign in with Google to accept)
 `);
 }
 

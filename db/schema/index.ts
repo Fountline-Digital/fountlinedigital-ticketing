@@ -2,6 +2,7 @@ export * from "./enums";
 export * from "./org";
 export * from "./auth";
 export * from "./access";
+export * from "./teams";
 export * from "./config";
 export * from "./packages";
 export * from "./clients";

@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { invites, memberships, organizations, sessions, userMfa } from "@/db/schema";
+import { invites, memberships, membershipTeamRoles, organizations, sessions, teamRoles, userMfa } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { createInvite as createInviteRecord, sendInviteEmail } from "@/lib/invites";
 import { ROLE_LABELS, type Role } from "@/lib/permissions";
@@ -65,6 +65,13 @@ export async function createInvite(_prev: InviteState, formData: FormData): Prom
     role,
     clientId: String(formData.get("clientId") ?? "") || null,
     accessEnds: String(formData.get("accessEnds") ?? "") || null,
+    teamRoles: (() => {
+      try {
+        return JSON.parse(String(formData.get("teamRoles") ?? "[]")) as { teamRoleId: string; isLead: boolean }[];
+      } catch {
+        return [];
+      }
+    })(),
     contact:
       role === "client"
         ? {
@@ -211,5 +218,35 @@ export async function resetTwoFactor(formData: FormData): Promise<ActionResult> 
     await audit({ orgId: ctx.orgId, actorUserId: ctx.user.id, actorRole: ctx.role, action: "auth.mfa_reset", entityType: "user", entityId: m.userId });
     revalidatePath(PATH);
     return "Two-factor reset. They'll set it up on their next sign-in.";
+  });
+}
+
+export async function setMemberTeamRoles(membershipId: string, roles: { teamRoleId: string; isLead: boolean }[]): Promise<ActionResult> {
+  const ctx = await requirePermission("users.manage");
+  return run(async () => {
+    const m = await membershipInOrg(ctx, membershipId);
+    if (m.role === "client") fail("Clients don't have team roles.");
+    const valid = await db.select({ id: teamRoles.id }).from(teamRoles).where(eq(teamRoles.orgId, ctx.orgId));
+    const clean = roles
+      .filter((r) => valid.some((v) => v.id === r.teamRoleId))
+      .map((r) => ({ membershipId: m.id, teamRoleId: r.teamRoleId, isLead: m.role === "contractor" ? false : r.isLead }));
+    if (m.role === "contractor" && roles.some((r) => r.isLead)) fail("Contractors can't lead a team, since leads see work across projects.");
+
+    const before = await db.select().from(membershipTeamRoles).where(eq(membershipTeamRoles.membershipId, m.id));
+    await db.transaction(async (tx) => {
+      await tx.delete(membershipTeamRoles).where(eq(membershipTeamRoles.membershipId, m.id));
+      if (clean.length) await tx.insert(membershipTeamRoles).values(clean);
+    });
+    await audit({
+      orgId: ctx.orgId,
+      actorUserId: ctx.user.id,
+      actorRole: ctx.role,
+      action: "membership.team_roles_change",
+      entityType: "membership",
+      entityId: m.id,
+      changes: { before: { roles: before.map((b) => ({ teamRoleId: b.teamRoleId, isLead: b.isLead })) }, after: { roles: clean } },
+    });
+    revalidatePath(PATH);
+    return clean.length ? "Team roles saved." : "Team roles removed.";
   });
 }

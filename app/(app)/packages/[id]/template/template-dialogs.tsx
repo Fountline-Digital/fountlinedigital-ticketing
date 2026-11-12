@@ -25,10 +25,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { replaceWithTemplateFrom, updatePhase, updateTask } from "./actions";
-import { GATE_LABELS, ROLE_LABELS, hours, useAction, type PhaseData, type TaskData } from "./template-shared";
+import { GATE_LABELS, hours, useAction, type PhaseData, type TaskData, type TeamRoleOption } from "./template-shared";
 
 const GATE_ITEMS = (Object.keys(GATE_LABELS) as PhaseData["gate"][]).map((g) => ({ value: g, label: GATE_LABELS[g] }));
-const ROLE_ITEMS = Object.entries(ROLE_LABELS).map(([value, label]) => ({ value, label }));
+const NO_ROLE = "__none";
 
 export function ConfirmDelete(props: {
   open: boolean;
@@ -149,6 +149,7 @@ export function TaskDialog({
   task,
   phases,
   allTasks,
+  teamRoles,
   onDelete,
 }: {
   open: boolean;
@@ -157,13 +158,15 @@ export function TaskDialog({
   task: TaskData;
   phases: PhaseData[];
   allTasks: TaskData[];
+  teamRoles: TeamRoleOption[];
   onDelete: () => void;
 }) {
   const { pending, run } = useAction();
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description);
   const [phaseId, setPhaseId] = useState(task.phaseId);
-  const [role, setRole] = useState(task.defaultRole);
+  const [role, setRole] = useState(task.teamRoleId ?? NO_ROLE);
+  const roleItems = [{ value: NO_ROLE, label: "No team role" }, ...teamRoles];
   const [estimate, setEstimate] = useState(task.estimateMinutes === null ? "" : String(hours(task.estimateMinutes)));
   const [clientVisible, setClientVisible] = useState(task.isClientVisible);
   const [checklist, setChecklist] = useState(task.checklist.join("\n"));
@@ -211,13 +214,13 @@ export function TaskDialog({
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Default role</Label>
-              <Select items={ROLE_ITEMS} value={role} onValueChange={(v) => setRole(String(v ?? "worker"))}>
+              <Label>Team role</Label>
+              <Select items={roleItems} value={role} onValueChange={(v) => setRole(String(v ?? NO_ROLE))}>
                 <SelectTrigger className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {ROLE_ITEMS.map((r) => (
+                  {roleItems.map((r) => (
                     <SelectItem key={r.value} value={r.value}>
                       {r.label}
                     </SelectItem>
@@ -283,7 +286,7 @@ export function TaskDialog({
                     title,
                     description,
                     phaseId,
-                    defaultRole: role,
+                    teamRoleId: role === NO_ROLE ? null : role,
                     estimateHours: estimate,
                     isClientVisible: clientVisible,
                     checklist,

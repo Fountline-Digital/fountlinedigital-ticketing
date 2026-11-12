@@ -53,6 +53,7 @@ export function TicketTable({ tickets, limitReached }: { tickets: TicketRow[]; l
                       </Link>
                       <div className="truncate text-xs text-muted-foreground">
                         {t.typeName}
+                        {t.teamRoleName ? ` · ${t.teamRoleName}` : ""}
                         {t.projectKey ? ` · ${t.projectKey}` : ""}
                         {t.clientName ? ` · ${t.clientName}` : ""}
                       </div>

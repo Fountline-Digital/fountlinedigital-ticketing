@@ -4,11 +4,13 @@ import { db } from "@/db";
 import { projectMembers, projectPhases, ticketStatuses, tickets } from "@/db/schema";
 import { can, type Role } from "@/lib/permissions";
 import type { UserContext } from "@/lib/session";
+import { leadRoleIds } from "@/lib/team-roles";
 
 export type TicketAccess = {
   ticket: typeof tickets.$inferSelect;
   canEdit: boolean; // status, checklist, comments, description...
   canAssign: boolean;
+  assignScope: string | null; // team role id a lead is limited to, or null for no limit
   canDelete: boolean;
 };
 
@@ -31,7 +33,10 @@ export async function ticketAccess(ctx: Pick<UserContext, "orgId" | "role" | "me
   if (ctx.role === "client") return null;
 
   const viewAll = await can(ctx.orgId, ctx.role as Role, "tickets.view_all");
-  let allowed = viewAll || ticket.assigneeMembershipId === ctx.membership.id || ticket.reporterUserId === ctx.user.id;
+  // Team leads see (and assign) every ticket in the team roles they lead.
+  const leads = ctx.role === "contractor" ? [] : await leadRoleIds(ctx.membership.id);
+  const leadsThis = Boolean(ticket.teamRoleId && leads.includes(ticket.teamRoleId));
+  let allowed = viewAll || leadsThis || ticket.assigneeMembershipId === ctx.membership.id || ticket.reporterUserId === ctx.user.id;
   if (!allowed && ticket.projectId) {
     const [m] = await db
       .select()
@@ -44,7 +49,9 @@ export async function ticketAccess(ctx: Pick<UserContext, "orgId" | "role" | "me
   return {
     ticket,
     canEdit: true,
-    canAssign: await can(ctx.orgId, ctx.role as Role, "tickets.assign"),
+    canAssign: leadsThis || (await can(ctx.orgId, ctx.role as Role, "tickets.assign")),
+    // Leads (without the global permission) may only assign within their team role.
+    assignScope: (await can(ctx.orgId, ctx.role as Role, "tickets.assign")) ? null : leadsThis ? ticket.teamRoleId : null,
     canDelete: await can(ctx.orgId, ctx.role as Role, "projects.manage"),
   } satisfies TicketAccess;
 }

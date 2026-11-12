@@ -18,6 +18,7 @@ import { gateApprover, membershipRole, packageStatus, pickerAccess, questionKind
 import { orgId } from "./org";
 import { users } from "./auth";
 import { serviceLines, tiers, ticketTypes } from "./config";
+import { teamRoles } from "./teams";
 
 export const packages = pgTable(
   "packages",
@@ -96,7 +97,8 @@ export const taskTemplates = pgTable(
     title: text("title").notNull(),
     description: text("description"),
     ticketTypeId: uuid("ticket_type_id").references((): AnyPgColumn => ticketTypes.id, { onDelete: "set null" }),
-    defaultRole: membershipRole("default_role"),
+    defaultRole: membershipRole("default_role"), // legacy; team_role_id is used now
+    teamRoleId: uuid("team_role_id").references((): AnyPgColumn => teamRoles.id, { onDelete: "set null" }),
     estimateMinutes: integer("estimate_minutes"),
     checklist: jsonb("checklist").$type<string[]>().notNull().default([]),
     isClientVisible: boolean("is_client_visible").notNull().default(false),

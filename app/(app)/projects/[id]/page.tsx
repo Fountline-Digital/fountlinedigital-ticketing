@@ -21,6 +21,7 @@ import {
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { can, ROLE_LABELS, type Role } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
+import { listTeamRoles } from "@/lib/team-roles";
 import { ProgressBar } from "../progress-bar";
 import { PhaseStatusBadge, ProjectStatusBadge, TicketStatus } from "../status-badge";
 import { NewTicketDialog } from "../../tickets/new-ticket-dialog";
@@ -136,6 +137,7 @@ export default async function ProjectPage({
               types={types.map((ty) => ({ value: ty.id, label: ty.name }))}
               defaultTypeId={types.find((ty) => ty.kind === "project_task")?.id}
               phases={phases.map((ph) => ({ value: ph.id, label: `P${ph.position} · ${ph.name}` }))}
+              teamRoles={(await listTeamRoles(orgId)).map((r) => ({ value: r.id, label: r.name }))}
             />
           </div>
         </div>
