@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, eq, inArray, isNull, ne } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { ArrowLeft, CalendarDays, Eye, Lock } from "lucide-react";
 import { db } from "@/db";
 import {
+  changeRequests,
   clients,
+  closeoutItems,
   memberships,
   organizations,
   packageVersions,
@@ -26,6 +28,9 @@ import { ProgressBar } from "../progress-bar";
 import { PhaseStatusBadge, ProjectStatusBadge, TicketStatus } from "../status-badge";
 import { NewTicketDialog } from "../../tickets/new-ticket-dialog";
 import { TeamCard } from "./team-card";
+import { CloseoutCard, PhaseGate, ProjectActions } from "./lifecycle";
+import { ChangeRequestsCard } from "./change-requests";
+import { approvalsFor } from "@/lib/phases";
 
 export default async function ProjectPage({
   params,
@@ -36,7 +41,7 @@ export default async function ProjectPage({
 }) {
   const { id } = await params;
   const { created } = await searchParams;
-  const { membership } = await requireUser();
+  const { membership, user } = await requireUser();
   const orgId = membership.orgId;
   const role = membership.role as Role;
 
@@ -72,6 +77,26 @@ export default async function ProjectPage({
     .where(and(eq(ticketTypes.orgId, orgId), eq(ticketTypes.isActive, true), ne(ticketTypes.kind, "lead")))
     .orderBy(asc(ticketTypes.sortOrder));
   const phases = await db.select().from(projectPhases).where(eq(projectPhases.projectId, p.id)).orderBy(asc(projectPhases.position));
+  const approvalRows = await approvalsFor(phases.map((ph) => ph.id));
+  const approverIds = [...new Set(approvalRows.map((a) => a.decidedByUserId).filter((v): v is string => Boolean(v)))];
+  const approverNames = approverIds.length ? await db.select({ id: users.id, name: users.name, email: users.email }).from(users).where(inArray(users.id, approverIds)) : [];
+  const approvalsForPhase = (ph: (typeof phases)[number]) =>
+    approvalRows
+      .filter((a) => a.projectPhaseId === ph.id && a.roundNumber === ph.revisionRoundsUsed + 1)
+      .map((a) => {
+        const who = approverNames.find((u) => u.id === a.decidedByUserId);
+        return { kind: a.approverKind, decision: a.decision, by: who ? who.name || who.email : null, comment: a.comment };
+      });
+  const closeout = await db.select().from(closeoutItems).where(eq(closeoutItems.projectId, p.id)).orderBy(asc(closeoutItems.position));
+
+  const crRows = await db
+    .select({ cr: changeRequests, ticketKey: tickets.key })
+    .from(changeRequests)
+    .leftJoin(tickets, eq(tickets.id, changeRequests.ticketId))
+    .where(eq(changeRequests.projectId, p.id))
+    .orderBy(desc(changeRequests.createdAt));
+  const teamRoleOptions = (await listTeamRoles(orgId)).map((r) => ({ value: r.id, label: r.name }));
+
   const ticketRows = await db
     .select({
       t: tickets,
@@ -131,13 +156,22 @@ export default async function ProjectPage({
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold tracking-tight">{p.name}</h1>
           <ProjectStatusBadge status={p.status} />
-          <div className="ml-auto">
+          <div className="ml-auto flex gap-2">
+            {canManage && (
+              <ProjectActions
+                projectId={p.id}
+                status={p.status}
+                name={p.name}
+                startDate={p.startDate ?? ""}
+                targetLaunchDate={p.targetLaunchDate ?? ""}
+              />
+            )}
             <NewTicketDialog
               projectId={p.id}
               types={types.map((ty) => ({ value: ty.id, label: ty.name }))}
               defaultTypeId={types.find((ty) => ty.kind === "project_task")?.id}
               phases={phases.map((ph) => ({ value: ph.id, label: `P${ph.position} · ${ph.name}` }))}
-              teamRoles={(await listTeamRoles(orgId)).map((r) => ({ value: r.id, label: r.name }))}
+              teamRoles={teamRoleOptions}
             />
           </div>
         </div>
@@ -187,6 +221,15 @@ export default async function ProjectPage({
                   </CardAction>
                 </CardHeader>
                 <CardContent className="space-y-1.5">
+                  <PhaseGate
+                    phaseId={ph.id}
+                    status={ph.status}
+                    gate={ph.gateApprover}
+                    approvals={approvalsForPhase(ph)}
+                    canManage={canManage && p.status === "active"}
+                    roundsUsed={ph.revisionRoundsUsed}
+                    roundsAllowed={ph.revisionRoundsAllowed}
+                  />
                   {phaseTickets.length === 0 && <p className="text-sm text-muted-foreground">No tickets in this phase.</p>}
                   {phaseTickets.map(({ t, statusName, statusColor, assigneeName, assigneeEmail }) => {
                     const waits = waitingOn(t.id);
@@ -215,8 +258,33 @@ export default async function ProjectPage({
             );
           })}
           {phases.length === 0 && <p className="text-sm text-muted-foreground">This package version had no phases.</p>}
+          <ChangeRequestsCard
+            projectId={p.id}
+            canManage={canManage}
+            phases={phases.map((ph) => ({ value: ph.id, label: `P${ph.position} · ${ph.name}` }))}
+            teamRoles={teamRoleOptions}
+            rows={crRows.map(({ cr, ticketKey }) => {
+              const ph = phases.find((x) => x.id === cr.projectPhaseId);
+              return {
+                id: cr.id,
+                key: cr.key,
+                title: cr.title,
+                description: cr.description ?? "",
+                status: cr.status,
+                priceCents: cr.priceCents,
+                estimateMinutes: cr.estimateMinutes,
+                phaseId: cr.projectPhaseId,
+                phaseLabel: ph ? `P${ph.position} · ${ph.name}` : null,
+                teamRoleId: cr.teamRoleId,
+                ticketKey,
+                decisionComment: cr.decisionComment,
+                mine: cr.requestedByUserId === user.id,
+              };
+            })}
+          />
         </div>
 
+        <div className="space-y-6">
         <TeamCard
           projectId={p.id}
           canManage={canManage}
@@ -224,6 +292,15 @@ export default async function ProjectPage({
           addable={addable.map((m) => ({ value: m.membershipId, label: `${m.name || m.email} (${ROLE_LABELS[m.role as Role]})` }))}
           timezone={org.timezone}
         />
+        <CloseoutCard
+          projectId={p.id}
+          items={closeout.map((c) => ({ id: c.id, label: c.label, done: Boolean(c.doneAt) }))}
+          signedOff={p.closeoutSignedOffAt ? new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeZone: org.timezone }).format(p.closeoutSignedOffAt) : null}
+          canManage={canManage}
+          allPhasesComplete={phases.length > 0 && phases.every((ph) => ph.status === "complete")}
+          status={p.status}
+        />
+        </div>
       </div>
     </div>
   );

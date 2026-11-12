@@ -169,6 +169,7 @@ export const changeRequests = pgTable(
       .references((): AnyPgColumn => projects.id, { onDelete: "cascade" }),
     ticketId: uuid("ticket_id").references((): AnyPgColumn => tickets.id, { onDelete: "set null" }),
     projectPhaseId: uuid("project_phase_id").references((): AnyPgColumn => projectPhases.id, { onDelete: "set null" }),
+    teamRoleId: uuid("team_role_id").references((): AnyPgColumn => teamRoles.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     description: text("description"),
     priceCents: integer("price_cents"),

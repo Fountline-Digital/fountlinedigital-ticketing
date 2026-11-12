@@ -5,6 +5,7 @@ import { projectMembers, projectPhases, ticketStatuses, tickets } from "@/db/sch
 import { can, type Role } from "@/lib/permissions";
 import type { UserContext } from "@/lib/session";
 import { leadRoleIds } from "@/lib/team-roles";
+import { notifySignOffNeeded, openApprovals } from "@/lib/phases";
 
 export type TicketAccess = {
   ticket: typeof tickets.$inferSelect;
@@ -76,6 +77,8 @@ export async function advancePhaseIfDone(tx: Tx, phaseId: string): Promise<strin
 
   if (phase.gateApprover !== "none") {
     await tx.update(projectPhases).set({ status: "awaiting_approval" }).where(eq(projectPhases.id, phaseId));
+    await openApprovals(tx, phase);
+    await notifySignOffNeeded(tx, phase);
     return `All of P${phase.position} ${phase.name} is done. It's waiting for sign-off.`;
   }
 
