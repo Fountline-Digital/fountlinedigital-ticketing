@@ -8,6 +8,7 @@ export function PackageTabs({ packageId }: { packageId: string }) {
   const tabs = [
     { href: `/packages/${packageId}`, label: "Settings" },
     { href: `/packages/${packageId}/template`, label: "Template" },
+    { href: `/packages/${packageId}/questionnaire`, label: "Questionnaire" },
   ];
   return (
     <nav className="flex gap-1 border-b text-sm">

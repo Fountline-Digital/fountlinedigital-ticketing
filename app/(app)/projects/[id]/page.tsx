@@ -31,6 +31,11 @@ import { TeamCard } from "./team-card";
 import { CloseoutCard, PhaseGate, ProjectActions } from "./lifecycle";
 import { ChangeRequestsCard } from "./change-requests";
 import { approvalsFor } from "@/lib/phases";
+import { listFiles } from "@/lib/file-access";
+import { FilesCard } from "@/components/files/files-card";
+import { IntakeCard } from "./intake-card";
+import { WebsiteCard } from "./website-card";
+import { LogoCard } from "./logo-card";
 
 export default async function ProjectPage({
   params,
@@ -285,6 +290,15 @@ export default async function ProjectPage({
         </div>
 
         <div className="space-y-6">
+        <IntakeCard projectId={p.id} timezone={org.timezone} />
+        <WebsiteCard projectId={p.id} orgId={orgId} canManage={canManage} timezone={org.timezone} />
+        <LogoCard projectId={p.id} showIfEmpty={canManage} />
+        <FilesCard
+          target={{ projectId: p.id }}
+          files={await listFiles({ projectId: p.id }, user.id, org.timezone)}
+          canManage={canManage}
+          description="Project files, including files added on its tickets."
+        />
         <TeamCard
           projectId={p.id}
           canManage={canManage}

@@ -1,6 +1,7 @@
 "use client";
 import { useActionState, useState, useTransition } from "react";
-import { Loader2, Mail, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Eye, Loader2, Mail, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { startPreview } from "@/app/portal/actions";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -141,7 +142,8 @@ export function ContactDialog({
           <DialogTitle>{contact ? "Edit contact" : "Add contact"}</DialogTitle>
           <DialogDescription>Adding a contact doesn&apos;t give them a login. Use &quot;Invite to portal&quot; for that.</DialogDescription>
         </DialogHeader>
-        <form action={action} className="grid gap-4">
+        {/* Keyed on the saved values so the checkboxes reset cleanly after a save */}
+        <form key={contact ? `${contact.id}-${contact.isPrimary}-${contact.isApprover}-${contact.isBilling}` : "new"} action={action} className="grid gap-4">
           <input type="hidden" name="clientId" value={clientId} />
           <input type="hidden" name="contactId" value={contact?.id ?? ""} />
           <div className="grid gap-2">
@@ -182,7 +184,7 @@ export function ContactDialog({
   );
 }
 
-export function ContactRowActions({ clientId, contact }: { clientId: string; contact: Contact }) {
+export function ContactRowActions({ clientId, contact, canPreview = false }: { clientId: string; contact: Contact; canPreview?: boolean }) {
   const [editOpen, setEditOpen] = useState(false);
   const [removeOpen, setRemoveOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -213,6 +215,12 @@ export function ContactRowActions({ clientId, contact }: { clientId: string; con
             <DropdownMenuItem disabled={pending} onClick={() => run(() => inviteContact(contact.id))}>
               <Mail />
               Invite to portal
+            </DropdownMenuItem>
+          )}
+          {canPreview && (
+            <DropdownMenuItem disabled={pending} onClick={() => run(() => startPreview(contact.id))}>
+              <Eye />
+              View portal as {contact.name.split(" ")[0]}
             </DropdownMenuItem>
           )}
           <DropdownMenuSeparator />

@@ -4,6 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { changeRequests, organizations, projectMembers, projectPhases, projects, teamRoles } from "@/db/schema";
 import { audit } from "@/lib/audit";
+import { announce, notify } from "@/lib/notify";
+import { clientUserIds } from "@/lib/portal";
 import { ChangeRequestError, approveChangeRequest, createChangeRequest } from "@/lib/change-requests";
 import { can, type Role } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
@@ -113,8 +115,28 @@ export async function sendCRToClient(crId: string): Promise<Result> {
     if (cr.priceCents === null) throw new ChangeRequestError("Add a price first (use 0 if there's no charge).");
     await db.update(changeRequests).set({ status: "pending_client" }).where(eq(changeRequests.id, cr.id));
     await log(ctx, "send", cr);
+    const [project] = await db.select().from(projects).where(eq(projects.id, cr.projectId));
+    await notify(db, {
+      orgId: ctx.orgId,
+      userIds: await clientUserIds(project?.clientId ?? null, { approversOnly: true }),
+      eventKey: "portal.approval_needed",
+      title: `Change request ${cr.key} needs your approval`,
+      body: cr.title,
+      url: `/portal/projects/${cr.projectId}`,
+    });
     return { msg: `${cr.key} is waiting on the client. They'll approve it in the portal; until then, record their answer here.`, projectId: cr.projectId };
   });
+}
+
+async function tellDecision(
+  ctx: { orgId: string; user: { id: string } },
+  cr: { requestedByUserId: string | null; projectId: string },
+  title: string,
+  body: string,
+) {
+  const msg = { title, body, url: `/projects/${cr.projectId}` };
+  await notify(db, { orgId: ctx.orgId, userIds: [cr.requestedByUserId], exceptUserId: ctx.user.id, eventKey: "change_request.decided", ...msg });
+  announce(ctx.orgId, "change_request.decided", msg);
 }
 
 export async function decideCR(crId: string, approve: boolean, comment: string): Promise<Result> {
@@ -128,6 +150,7 @@ export async function decideCR(crId: string, approve: boolean, comment: string):
       const [org] = await db.select().from(organizations).where(eq(organizations.id, ctx.orgId));
       const { ticket } = await db.transaction((tx) => approveChangeRequest(tx, cr.id, ctx.user.id, org.keyPrefix, note));
       await log(ctx, "approve", cr, { ticket: ticket.key, recordedByStaff: true });
+      await tellDecision(ctx, cr, `${cr.key} approved`, `${cr.title}. ${ticket.key} was created for the work.`);
       return { msg: `${cr.key} approved. ${ticket.key} was created for the work.`, projectId: cr.projectId };
     }
     await db
@@ -135,6 +158,7 @@ export async function decideCR(crId: string, approve: boolean, comment: string):
       .set({ status: "declined", decidedByUserId: ctx.user.id, decidedAt: new Date(), decisionComment: note })
       .where(eq(changeRequests.id, cr.id));
     await log(ctx, "decline", cr, { recordedByStaff: true });
+    await tellDecision(ctx, cr, `${cr.key} declined`, [cr.title, note].filter(Boolean).join(" · "));
     return { msg: `${cr.key} declined.`, projectId: cr.projectId };
   });
 }

@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { memberships, sessions, userMfa, users } from "@/db/schema";
+import { memberships, organizations, sessions, userMfa, users } from "@/db/schema";
+import { SETTING_DEFAULTS } from "@/lib/org-settings";
 import { auth } from "@/lib/auth";
 import { can, type Permission, type Role } from "@/lib/permissions";
 
@@ -43,6 +44,16 @@ export async function requireUser() {
       .where(and(eq(memberships.userId, user.id), eq(memberships.status, "active")))
   ).filter((m) => !m.accessExpiresAt || m.accessExpiresAt > now);
   if (userMemberships.length === 0) redirect("/sign-in?error=no_access");
+
+  // Session length per role (Settings > Access), counted from when two-factor was passed
+  const membership = userMemberships[0];
+  const [org] = await db.select({ settings: organizations.settings }).from(organizations).where(eq(organizations.id, membership.orgId));
+  const role = membership.role as Role;
+  const maxMinutes = org?.settings.sessionMinutesByRole?.[role] ?? SETTING_DEFAULTS.sessionMinutesByRole[role];
+  if ((row.mfaVerifiedAt as Date).getTime() + maxMinutes * 60_000 < now.getTime()) {
+    await db.delete(sessions).where(eq(sessions.id, session.id));
+    redirect("/sign-in?error=session_expired");
+  }
 
   return { user, session, memberships: userMemberships, membership: userMemberships[0] };
 }

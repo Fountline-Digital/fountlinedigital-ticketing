@@ -3,20 +3,13 @@ import { PageHeader } from "@/components/page-header";
 import { personalDashboard, teamDashboard } from "@/lib/dashboard";
 import { can, ROLE_LABELS, type Role } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
+import { timeAgo } from "@/lib/time-ago";
 import { listTeamRoles, memberTeamRoles } from "@/lib/team-roles";
 import { TeamTab } from "./team-tab";
 import { NotificationsCard } from "./notifications-card";
 import { ApprovalsCard, MyTicketsCard, ProjectsCard, StatTile, WorkloadCard } from "./widgets";
 
-const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
-function ago(date: Date) {
-  const s = Math.round((date.getTime() - Date.now()) / 1000);
-  const abs = Math.abs(s);
-  if (abs < 60) return "just now";
-  if (abs < 3600) return rtf.format(Math.round(s / 60), "minute");
-  if (abs < 86400) return rtf.format(Math.round(s / 3600), "hour");
-  return rtf.format(Math.round(s / 86400), "day");
-}
+const ago = timeAgo;
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ error?: string; tab?: string }> }) {
   const { error, tab } = await searchParams;

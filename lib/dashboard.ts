@@ -103,13 +103,13 @@ export async function recentNotifications(userId: string, orgId: string, limit =
   const items = await db
     .select()
     .from(notifications)
-    .where(and(eq(notifications.recipientUserId, userId), eq(notifications.orgId, orgId)))
+    .where(and(eq(notifications.recipientUserId, userId), eq(notifications.orgId, orgId), eq(notifications.inApp, true)))
     .orderBy(desc(notifications.createdAt))
     .limit(limit);
   const [unread] = await db
     .select({ n: count() })
     .from(notifications)
-    .where(and(eq(notifications.recipientUserId, userId), eq(notifications.orgId, orgId), isNull(notifications.readAt)));
+    .where(and(eq(notifications.recipientUserId, userId), eq(notifications.orgId, orgId), eq(notifications.inApp, true), isNull(notifications.readAt)));
   return { items, unread: unread?.n ?? 0 };
 }
 

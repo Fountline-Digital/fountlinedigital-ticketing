@@ -11,7 +11,7 @@ export async function markNotificationRead(id: string) {
     .update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.id, id), eq(notifications.recipientUserId, user.id), isNull(notifications.readAt)));
-  revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
 }
 
 export async function markAllNotificationsRead() {
@@ -20,5 +20,5 @@ export async function markAllNotificationsRead() {
     .update(notifications)
     .set({ readAt: new Date() })
     .where(and(eq(notifications.recipientUserId, user.id), eq(notifications.orgId, membership.orgId), isNull(notifications.readAt)));
-  revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
 }

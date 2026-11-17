@@ -19,6 +19,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const ctx = await requirePermission("clients.view");
   const canManage = await can(ctx.orgId, ctx.role, "clients.manage");
+  const canPreview = await can(ctx.orgId, ctx.role, "settings.manage");
   const canCreateProject = await can(ctx.orgId, ctx.role, "projects.manage");
 
   const [client] = await db
@@ -179,6 +180,7 @@ export default async function ClientPage({ params }: { params: Promise<{ id: str
                       {canManage && (
                         <ContactRowActions
                           clientId={client.id}
+                          canPreview={canPreview}
                           contact={{
                             id: c.id,
                             name: c.name,

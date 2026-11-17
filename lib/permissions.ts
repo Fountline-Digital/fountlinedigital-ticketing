@@ -25,7 +25,22 @@ export const DEFAULT_PERMISSIONS = {
 export type Permission = keyof typeof DEFAULT_PERMISSIONS;
 
 // Security minimums: these can never be changed by an override.
-const LOCKED: Permission[] = ["users.manage", "settings.manage", "audit.view"];
+export const LOCKED: Permission[] = ["users.manage", "settings.manage", "audit.view"];
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+  "users.view": "See users and invites",
+  "users.invite": "Invite people",
+  "users.manage": "Change roles, deactivate, reset two-factor",
+  "settings.manage": "Change settings",
+  "packages.manage": "Edit packages, templates and website designs",
+  "clients.view": "See clients",
+  "clients.manage": "Add and edit clients",
+  "projects.view_all": "See every project",
+  "projects.manage": "Create and manage projects, approvals and change requests",
+  "tickets.view_all": "See every ticket",
+  "tickets.assign": "Assign tickets to anyone",
+  "audit.view": "See the audit log",
+};
 
 // Who each role may invite.
 export const INVITABLE_ROLES: Record<Role, Role[]> = {

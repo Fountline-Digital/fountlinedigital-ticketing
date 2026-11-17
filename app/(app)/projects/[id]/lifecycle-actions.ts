@@ -4,6 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { closeoutItems, organizations, projectPhases, projects } from "@/db/schema";
 import { audit } from "@/lib/audit";
+import { announce } from "@/lib/notify";
 import { decide, notifySignOffNeeded, openApprovals, type ApproverKind } from "@/lib/phases";
 import { requirePermission } from "@/lib/session";
 
@@ -43,6 +44,9 @@ export async function decidePhase(phaseId: string, kind: ApproverKind, approve: 
       // A manager recording the client's decision is logged as such
       metadata: { phase: `P${phase.position} ${phase.name}`, approver: kind, recordedByStaff: kind === "client", comment: comment.trim() || null },
     });
+    if (r.completed && project) {
+      announce(ctx.orgId, "phase.approved", { title: `${project.key}: P${phase.position} ${phase.name} approved`, body: r.message, url: `/projects/${project.id}` });
+    }
     refresh(phase.projectId);
     return { ok: r.message };
   } catch (err) {

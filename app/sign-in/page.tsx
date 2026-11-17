@@ -7,6 +7,7 @@ import { SignInForm } from "./sign-in-form";
 const ERRORS: Record<string, string> = {
   no_access: "You don't have access. Ask an admin for an invite.",
   forbidden: "You don't have access. Ask an admin for an invite.",
+  session_expired: "You've been signed in for a while, so please sign in again.",
 };
 
 export default async function SignInPage({
@@ -21,7 +22,7 @@ export default async function SignInPage({
   const message = error ? (ERRORS[error.toLowerCase()] ?? "Sign-in didn't work. Please try again.") : null;
 
   return (
-    <AuthShell title="Sign in">
+    <AuthShell title="Sign in" description="For the Fountline Digital team, contractors and clients.">
       {message && (
         <p className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{message}</p>
       )}

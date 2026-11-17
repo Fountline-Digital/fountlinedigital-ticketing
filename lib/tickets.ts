@@ -1,7 +1,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { projectMembers, projectPhases, ticketStatuses, tickets } from "@/db/schema";
+import { membershipTeamRoles, projectMembers, projectPhases, ticketStatuses, tickets } from "@/db/schema";
 import { can, type Role } from "@/lib/permissions";
 import type { UserContext } from "@/lib/session";
 import { leadRoleIds } from "@/lib/team-roles";
@@ -38,6 +38,14 @@ export async function ticketAccess(ctx: Pick<UserContext, "orgId" | "role" | "me
   const leads = ctx.role === "contractor" ? [] : await leadRoleIds(ctx.membership.id);
   const leadsThis = Boolean(ticket.teamRoleId && leads.includes(ticket.teamRoleId));
   let allowed = viewAll || leadsThis || ticket.assigneeMembershipId === ctx.membership.id || ticket.reporterUserId === ctx.user.id;
+  // Leads are shared across the whole sales team (not just its lead), so anyone can pick one up
+  if (!allowed && ticket.leadStageId && ticket.teamRoleId && ctx.role !== "contractor") {
+    const [member] = await db
+      .select()
+      .from(membershipTeamRoles)
+      .where(and(eq(membershipTeamRoles.membershipId, ctx.membership.id), eq(membershipTeamRoles.teamRoleId, ticket.teamRoleId)));
+    allowed = Boolean(member);
+  }
   if (!allowed && ticket.projectId) {
     const [m] = await db
       .select()

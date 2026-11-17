@@ -25,10 +25,14 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/session";
 import { ticketAccess } from "@/lib/tickets";
+import { listFiles } from "@/lib/file-access";
+import { FilesCard } from "@/components/files/files-card";
 import { ActivityList, type ActivityItem } from "./activity";
 import { Checklist } from "./checklist";
 import { Comments } from "./comments";
 import { LinksCard } from "./links";
+import { LeadCard } from "./lead-card";
+import { ResponseTarget } from "./response-target";
 import { TicketFields, TicketHeaderEditor } from "./ticket-fields";
 
 export default async function TicketPage({ params }: { params: Promise<{ key: string }> }) {
@@ -134,6 +138,7 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
     metadata: (a.metadata ?? null) as Record<string, unknown> | null,
     when: fmt.format(a.createdAt),
   }));
+  const fileRows = await listFiles({ ticketId: t.id }, ctx.user.id, tz);
   const memberName = new Map(team.map((m) => [m.membershipId, m.name || m.email] as const));
 
   return (
@@ -173,6 +178,8 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
             }))}
           />
 
+          <FilesCard target={{ ticketId: t.id }} files={fileRows} canManage={access.canDelete} />
+
           <Comments
             ticketId={t.id}
             ticketClientVisible={t.isClientVisible}
@@ -182,7 +189,7 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
             comments={commentRows.map(({ c, name, email }) => ({
               id: c.id,
               authorId: c.authorUserId,
-              author: name || email || "Deleted user",
+              author: name || email || (c.authorUserId ? "Deleted user" : "System"),
               body: c.body,
               visibility: c.visibility,
               when: fmt.format(c.createdAt),
@@ -201,6 +208,16 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
         </div>
 
         <div className="space-y-6">
+          {/* Only while waiting on the first reply; it disappears once someone responds or the ticket closes */}
+          {t.responseDueAt && !t.firstResponseAt && !t.closedAt && (
+            <ResponseTarget
+              orgId={ctx.orgId}
+              timezone={tz}
+              dueAt={t.responseDueAt}
+              firstResponseAt={t.firstResponseAt}
+              closed={Boolean(t.closedAt)}
+            />
+          )}
           <TicketFields
             ticketId={t.id}
             canAssign={access.canAssign}
@@ -226,6 +243,7 @@ export default async function TicketPage({ params }: { params: Promise<{ key: st
               created: fmt.format(t.createdAt),
             }}
           />
+          {t.leadStageId && <LeadCard t={t} role={ctx.role} />}
           <LinksCard ticketId={t.id} links={links} />
         </div>
       </div>

@@ -1,11 +1,13 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { memberships, notifications, phaseApprovals, projectPhases, projects, ticketStatuses, tickets } from "@/db/schema";
+import { memberships, phaseApprovals, projectPhases, projects, ticketStatuses, tickets } from "@/db/schema";
 import { nextTicketNumber, ticketKey } from "@/lib/keys";
 import { pickAssignee } from "@/lib/team-roles";
 import { createChangeRequest } from "@/lib/change-requests";
 import { unlockNextPhase } from "@/lib/tickets";
+import { announce, notify } from "@/lib/notify";
+import { clientUserIds } from "@/lib/portal";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type ApproverKind = "manager" | "client";
@@ -38,17 +40,19 @@ export async function notifySignOffNeeded(tx: Tx, phase: typeof projectPhases.$i
     .select({ userId: memberships.userId })
     .from(memberships)
     .where(and(eq(memberships.orgId, phase.orgId), eq(memberships.status, "active"), inArray(memberships.role, ["admin", "manager"])));
-  if (people.length === 0) return;
-  await tx.insert(notifications).values(
-    people.map((p) => ({
+  const msg = { title: `${project.key}: P${phase.position} ${phase.name} is ready for sign-off`, body: project.name, url: `/projects/${project.id}` };
+  await notify(tx, { orgId: phase.orgId, userIds: people.map((p) => p.userId), eventKey: "phase.awaiting_approval", ...msg });
+  announce(phase.orgId, "phase.awaiting_approval", msg);
+  if (requiredApprovers(phase.gateApprover).includes("client")) {
+    await notify(tx, {
       orgId: phase.orgId,
-      recipientUserId: p.userId,
-      eventKey: "phase.awaiting_approval",
-      title: `${project.key}: P${phase.position} ${phase.name} is ready for sign-off`,
-      body: project.name,
-      url: `/projects/${project.id}`,
-    })),
-  );
+      userIds: await clientUserIds(project.clientId, { approversOnly: true }),
+      eventKey: "portal.approval_needed",
+      title: `${phase.name} is ready for your review`,
+      body: `${project.name}: please approve it or request changes.`,
+      url: `/portal/projects/${project.id}`,
+    });
+  }
 }
 
 export async function approvalsFor(phaseIds: string[]) {
@@ -68,7 +72,7 @@ export async function decide(input: {
   comment: string | null;
   userId: string;
   orgPrefix: string;
-}): Promise<{ message: string; overLimit?: boolean }> {
+}): Promise<{ message: string; overLimit?: boolean; completed?: boolean }> {
   return db.transaction(async (tx) => {
     const [phase] = await tx.select().from(projectPhases).where(eq(projectPhases.id, input.phaseId));
     if (!phase || phase.status !== "awaiting_approval") throw new Error("This phase isn't waiting for sign-off.");
@@ -113,7 +117,7 @@ export async function decide(input: {
 
       await tx.update(projectPhases).set({ status: "complete", completedAt: new Date() }).where(eq(projectPhases.id, phase.id));
       const next = await unlockNextPhase(tx, phase.projectId, phase.position);
-      return { message: `P${phase.position} ${phase.name} approved. ${next ?? ""}`.trim() };
+      return { message: `P${phase.position} ${phase.name} approved. ${next ?? ""}`.trim(), completed: true };
     }
 
     // Request changes: use a revision round and send the phase back to work.

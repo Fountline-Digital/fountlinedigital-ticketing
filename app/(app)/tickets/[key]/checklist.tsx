@@ -36,7 +36,7 @@ export function Checklist({ ticketId, items }: { ticketId: string; items: Item[]
               variant="ghost"
               size="icon-xs"
               aria-label={`Remove ${i.label}`}
-              className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              className="[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 focus-visible:opacity-100"
               onClick={() => run(() => deleteChecklistItem(i.id), undefined, true)}
             >
               <X />

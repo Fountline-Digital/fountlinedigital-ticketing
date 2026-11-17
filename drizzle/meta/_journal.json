@@ -29,6 +29,20 @@
       "when": 1794484016209,
       "tag": "0003_gigantic_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794487142338,
+      "tag": "0004_easy_toad",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794490306425,
+      "tag": "0005_clean_kree",
+      "breakpoints": true
     }
   ]
 }

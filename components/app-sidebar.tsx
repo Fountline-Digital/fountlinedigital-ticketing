@@ -1,15 +1,23 @@
 "use client";
+import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Bell,
+  BellRing,
   Building2,
   ChevronsUpDown,
   FolderKanban,
   LayoutDashboard,
   LogOut,
   Package,
+  Palette,
+  Scale,
+  ScrollText,
   Settings,
+  Target,
   Ticket,
+  Trash2,
   UsersRound,
   Users,
   type LucideIcon,
@@ -36,10 +44,11 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { authClient } from "@/lib/auth-client";
 
-export type NavIcon = "dashboard" | "tickets" | "projects" | "clients" | "packages" | "users" | "teams" | "settings";
+export type NavIcon = "dashboard" | "tickets" | "projects" | "leads" | "clients" | "packages" | "users" | "teams" | "bell" | "audit" | "trash" | "legal" | "designs" | "settings";
 export type NavItem = { href: string; label: string; icon: NavIcon; soon?: boolean };
 export type NavSection = { label: string; items: NavItem[] };
 
@@ -47,10 +56,16 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   dashboard: LayoutDashboard,
   tickets: Ticket,
   projects: FolderKanban,
+  leads: Target,
   clients: Building2,
   packages: Package,
   users: Users,
   teams: UsersRound,
+  bell: BellRing,
+  audit: ScrollText,
+  trash: Trash2,
+  legal: Scale,
+  designs: Palette,
   settings: Settings,
 };
 
@@ -62,6 +77,12 @@ export function AppSidebar({
   user: { name: string; email: string; roleLabel: string };
 }) {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  // On phones the sidebar is a slide-over: close it once a link has navigated.
+  useEffect(() => {
+    if (isMobile) setOpenMobile(false);
+  }, [pathname, isMobile, setOpenMobile]);
   const router = useRouter();
   const initials = (user.name || user.email).slice(0, 2).toUpperCase();
 
@@ -134,6 +155,11 @@ export function AppSidebar({
                     <div className="truncate font-normal">{user.email}</div>
                   </DropdownMenuLabel>
                 </DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem render={<Link href="/account/notifications" />}>
+                  <Bell />
+                  My notification settings
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={async () => {

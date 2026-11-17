@@ -27,6 +27,9 @@ export type OrgSettings = {
     supportPhone?: string;
     approvalWording?: string;
   };
+  intake?: {
+    rateLimitPerHour?: number; // contact form submissions per visitor IP, default 5
+  };
   notifications?: {
     senderName?: string;
     replyTo?: string;

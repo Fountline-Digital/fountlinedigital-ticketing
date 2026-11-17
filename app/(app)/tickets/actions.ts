@@ -7,7 +7,6 @@ import {
   commentMentions,
   comments,
   memberships,
-  notifications,
   organizations,
   priorities,
   projectMembers,
@@ -27,6 +26,9 @@ import { nextTicketNumber, ticketKey } from "@/lib/keys";
 import { can } from "@/lib/permissions";
 import { requireUser } from "@/lib/session";
 import { advancePhaseIfDone, ticketAccess } from "@/lib/tickets";
+import { announce, notify } from "@/lib/notify";
+import { responseDueFor } from "@/lib/response-targets";
+import { clientUserIds } from "@/lib/portal";
 
 export type Result = { ok?: string; error?: string };
 export type FormState = Result & { at?: number };
@@ -62,8 +64,22 @@ async function logTicket(
   });
 }
 
-async function notify(orgId: string, recipientUserId: string, eventKey: string, title: string, ticket: { id: string; key: string }, body?: string) {
-  await db.insert(notifications).values({ orgId, recipientUserId, eventKey, title, body: body ?? null, url: `/tickets/${ticket.key}`, ticketId: ticket.id });
+const who = (ctx: { user: { name: string; email: string } }) => ctx.user.name || ctx.user.email;
+
+/** The user behind a ticket's assignee (memberships point at users). */
+async function assigneeUserId(membershipId: string | null) {
+  if (!membershipId) return null;
+  const [m] = await db.select({ userId: memberships.userId }).from(memberships).where(eq(memberships.id, membershipId));
+  return m?.userId ?? null;
+}
+
+/**
+ * The response clock stops the first time anyone on the team comments or changes the status.
+ * (These actions are team-only; clients reply through the portal, which never stops it.)
+ */
+async function markFirstResponse(t: { id: string; firstResponseAt: Date | null; responseDueAt: Date | null }, _userId: string) {
+  if (t.firstResponseAt || !t.responseDueAt) return;
+  await db.update(tickets).set({ firstResponseAt: new Date() }).where(and(eq(tickets.id, t.id), isNull(tickets.firstResponseAt)));
 }
 
 // ---------------------------------------------------------------------------
@@ -190,9 +206,17 @@ export async function updateTicket(ticketId: string, patch: TicketPatch): Promis
     await tx.update(tickets).set(set).where(eq(tickets.id, t.id));
     if (newStatusCategory && t.projectPhaseId) statusMessage = await advancePhaseIfDone(tx, t.projectPhaseId);
   });
+  if (newStatusCategory) await markFirstResponse(t, ctx.user.id);
   await logTicket(ctx, t, "update", { before, after });
-  if (newAssigneeUserId && newAssigneeUserId !== ctx.user.id) {
-    await notify(ctx.orgId, newAssigneeUserId, "ticket.assigned", `${ctx.user.name || ctx.user.email} assigned you ${t.key}`, t, t.title);
+  const ticketNote = { orgId: ctx.orgId, url: `/tickets/${t.key}`, ticketId: t.id, exceptUserId: ctx.user.id };
+  if (newAssigneeUserId) {
+    await notify(db, { ...ticketNote, userIds: [newAssigneeUserId], eventKey: "ticket.assigned", title: `${who(ctx)} assigned you ${t.key}`, body: t.title });
+  }
+  if (newStatusCategory && after.status) {
+    await notify(db, { ...ticketNote, userIds: [t.reporterUserId], eventKey: "ticket.status", title: `${t.key} is now ${after.status}`, body: t.title });
+    if (t.isClientVisible) {
+      await notify(db, { ...ticketNote, url: `/portal/tickets/${t.key}`, userIds: await clientUserIds(t.clientId), eventKey: "portal.status", title: `${t.title} is now ${after.status}`, body: t.key });
+    }
   }
 
   refresh(t.key, t.projectId);
@@ -287,11 +311,18 @@ export async function addComment(ticketId: string, body: string, visibility: "in
     .insert(comments)
     .values({ orgId: ctx.orgId, ticketId, authorUserId: ctx.user.id, body: text, visibility })
     .returning();
+  await markFirstResponse(access.ticket, ctx.user.id);
   if (mentions.length > 0) {
     await db.insert(commentMentions).values(mentions.map((userId) => ({ commentId: comment.id, userId })));
-    for (const userId of mentions) {
-      await notify(ctx.orgId, userId, "ticket.mentioned", `${ctx.user.name || ctx.user.email} mentioned you on ${access.ticket.key}`, access.ticket, text.slice(0, 200));
-    }
+  }
+  const t = access.ticket;
+  const ticketNote = { orgId: ctx.orgId, url: `/tickets/${t.key}`, ticketId: t.id, exceptUserId: ctx.user.id, body: text.slice(0, 300) };
+  await notify(db, { ...ticketNote, userIds: mentions, eventKey: "ticket.mentioned", title: `${who(ctx)} mentioned you on ${t.key}` });
+  // Assignee and reporter hear about new comments (unless they were just mentioned)
+  const watchers = [await assigneeUserId(t.assigneeMembershipId), t.reporterUserId].filter((id): id is string => Boolean(id) && !mentions.includes(id as string));
+  await notify(db, { ...ticketNote, userIds: watchers, eventKey: "ticket.commented", title: `${who(ctx)} commented on ${t.key}` });
+  if (visibility === "client") {
+    await notify(db, { ...ticketNote, url: `/portal/tickets/${t.key}`, userIds: await clientUserIds(t.clientId), eventKey: "portal.reply", title: `New reply on “${t.title}”` });
   }
   await logTicket(ctx, access.ticket, "comment", undefined, { commentId: comment.id, visibility });
   refresh(access.ticket.key, access.ticket.projectId);
@@ -391,6 +422,7 @@ export async function createTicket(_prev: FormState, formData: FormData): Promis
   const [priority] = await db.select().from(priorities).where(and(eq(priorities.orgId, ctx.orgId), eq(priorities.isDefault, true))).limit(1);
   const [anyPriority] = priority ? [priority] : await db.select().from(priorities).where(eq(priorities.orgId, ctx.orgId)).limit(1);
   const [org] = await db.select().from(organizations).where(eq(organizations.id, ctx.orgId));
+  const responseDueAt = await responseDueFor(ctx.orgId, type.kind, projectId);
 
   const created = await db.transaction(async (tx) => {
     const n = await nextTicketNumber(tx, ctx.orgId);
@@ -412,12 +444,14 @@ export async function createTicket(_prev: FormState, formData: FormData): Promis
         teamRoleId,
         assigneeMembershipId: ctx.membership.id,
         reporterUserId: ctx.user.id,
+        responseDueAt,
       })
       .returning();
     return t;
   });
 
   await logTicket(ctx, created, "create", { after: { title, type: type.name } });
+  announce(ctx.orgId, "ticket.created", { title: `${created.key}: ${title}`, body: `${type.name} · created by ${who(ctx)}`, url: `/tickets/${created.key}` });
   refresh(created.key, projectId);
   redirect(`/tickets/${created.key}`);
 }

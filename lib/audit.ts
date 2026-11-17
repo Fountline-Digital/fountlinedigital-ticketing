@@ -1,4 +1,5 @@
 import "server-only";
+import * as Sentry from "@sentry/nextjs";
 import { db } from "@/db";
 import { auditLog } from "@/db/schema";
 
@@ -11,5 +12,6 @@ export async function audit(entry: AuditEntry) {
     await db.insert(auditLog).values(entry);
   } catch (err) {
     console.error("[audit] failed to write entry", entry.action, err);
+    Sentry.captureException(err, { tags: { area: "audit" }, extra: { action: entry.action } });
   }
 }

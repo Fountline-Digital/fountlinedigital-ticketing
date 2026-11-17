@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { clients, memberships, projectMembers, projects } from "@/db/schema";
 import { audit } from "@/lib/audit";
 import { ProjectError, createProjectFromPackage } from "@/lib/projects";
+import { announce } from "@/lib/notify";
 import { requirePermission } from "@/lib/session";
 
 export type FormState = { ok?: string; error?: string; at?: number };
@@ -60,6 +61,11 @@ export async function createProject(_prev: FormState, formData: FormData): Promi
     entityId: created.project.id,
     entityKey: created.project.key,
     metadata: { client: client.key, package: created.packageKey, tickets: created.ticketCount },
+  });
+  announce(ctx.orgId, "project.created", {
+    title: `New project ${created.project.key}: ${name}`,
+    body: `${client.name} · ${created.packageKey} · ${created.ticketCount} tickets`,
+    url: `/projects/${created.project.id}`,
   });
   revalidatePath("/projects");
   revalidatePath(`/clients/${clientId}`);

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono, Montserrat } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -21,6 +21,11 @@ export const metadata: Metadata = {
   title: "Fountline Digital Portal",
   description: "Projects, tickets and support for Fountline Digital clients and team.",
   robots: { index: false, follow: false },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

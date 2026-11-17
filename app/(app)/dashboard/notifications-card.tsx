@@ -9,7 +9,17 @@ import { markAllNotificationsRead, markNotificationRead } from "../notifications
 
 type Item = { id: string; title: string; body: string | null; url: string | null; ago: string; unread: boolean };
 
-export function NotificationsCard({ items, unread }: { items: Item[]; unread: number }) {
+export function NotificationsCard({
+  items,
+  unread,
+  title = "Notifications",
+  footer,
+}: {
+  items: Item[];
+  unread: number;
+  title?: string;
+  footer?: React.ReactNode;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
 
@@ -18,7 +28,7 @@ export function NotificationsCard({ items, unread }: { items: Item[]; unread: nu
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Bell className="size-4" />
-          Notifications
+          {title}
         </CardTitle>
         <CardDescription>{unread > 0 ? `${unread} unread` : "You're all caught up."}</CardDescription>
         {unread > 0 && (
@@ -57,6 +67,7 @@ export function NotificationsCard({ items, unread }: { items: Item[]; unread: nu
             ))}
           </ul>
         )}
+        {footer}
       </CardContent>
     </Card>
   );

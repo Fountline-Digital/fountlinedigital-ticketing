@@ -1,6 +1,6 @@
 // In-app notifications and the append-only audit log.
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
-import { index, inet, jsonb, pgTable, text, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, index, inet, jsonb, pgTable, text, uuid, varchar } from "drizzle-orm/pg-core";
 import { pk, ts } from "./columns";
 import { actorKind, membershipRole } from "./enums";
 import { orgId } from "./org";
@@ -21,9 +21,15 @@ export const notifications = pgTable(
     url: text("url"),
     ticketId: uuid("ticket_id").references((): AnyPgColumn => tickets.id, { onDelete: "cascade" }),
     readAt: ts("read_at"),
+    inApp: boolean("in_app").notNull().default(true), // false = email only, hidden from the bell
+    emailStatus: varchar("email_status", { length: 12 }), // null (no email) | pending | sent | failed
+    emailedAt: ts("emailed_at"),
     createdAt: ts("created_at").notNull().defaultNow(),
   },
-  (t) => [index("notifications_recipient_idx").on(t.recipientUserId, t.readAt)],
+  (t) => [
+    index("notifications_recipient_idx").on(t.recipientUserId, t.readAt),
+    index("notifications_email_pending_idx").on(t.emailStatus, t.createdAt),
+  ],
 );
 
 // Every action by every user and by the system. Append-only: the migration in
